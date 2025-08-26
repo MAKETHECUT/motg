@@ -1,3 +1,4 @@
+/*
 (function lockSite() {
   if (!sessionStorage.getItem("siteAccessGranted")) {
     let authenticated = false;
@@ -13,6 +14,7 @@
     }
   }
 })();
+*/
 
 
 // Must be at the very top of your script
