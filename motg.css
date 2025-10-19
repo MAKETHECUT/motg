@@ -72,6 +72,25 @@ body {
     font-size: 24px;
 }
 
+#preloader {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bordo);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 9999;
+}
+
+#preloader .counter {
+    color: var(--lightred);
+    font-size: 48px;
+    font-weight: bold;
+}
+
 /* ==============================================
        Hide Scrollbar
 ============================================== */
@@ -1118,7 +1137,7 @@ video {
     object-fit: cover;
     width: 100%;
     min-height: 100%;
-    
+    z-index:99;
 }
 
 
@@ -1130,7 +1149,7 @@ video {
   height: 100%;
   z-index: 10;
   cursor: pointer;
-  background:none!important;
+  background:black;
 }
 
 
@@ -1256,7 +1275,8 @@ video {
 .logos-track {
 	display: flex;
 	width: max-content;
-	animation: scroll 15s linear infinite;
+  grid-gap: 12vw;
+	animation: scroll 45s linear infinite;
 }
 
 .logos-track::after {
@@ -1264,11 +1284,12 @@ video {
 	display: flex;
 }
 
-.marquee-logo img {
+.marquee-logo * {
 	flex: 0 0 auto;
-	width: 10.359vw;
-	height: 4.109vw;
-	margin-left: 10vw;
+  width: 9vw;
+  height: 9vw;
+  aspect-ratio: 1/1;
+  object-fit: contain;
 	display: grid;
 	place-items: center;
 	cursor: pointer;
@@ -1386,9 +1407,9 @@ video {
   .home-featured .featured-projects {
     grid-gap: 12vw;
   }
-  .marquee-logo img {
-    width: 30vw;
-    height: 8vw;
+  .marquee-logo * {
+    width: 15vw;
+    height: 15vw;
   }
   .home-featured .link-box {
     padding:23vw 0vw;
@@ -3257,6 +3278,5 @@ Thank You Page
   margin: auto;
   width: fit-content;
 }
-
 
 
