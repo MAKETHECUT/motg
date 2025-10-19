@@ -1587,76 +1587,6 @@ function initGridOverlayToggle() {
 }
 
 
-// ============================================================
-// DYNAMIC MARQUEE ANIMATION
-// ============================================================
-
-function applyDynamicMarqueeAnimation(sliderSelector, itemSelector, durationSeconds = 40) {
-  const slider = document.querySelector(sliderSelector);
-  if (!slider) return;
-
-  const wrapper = slider.querySelector(".slider-wrapper");
-  if (!wrapper) return;
-
-  const items = Array.from(wrapper.querySelectorAll(itemSelector));
-  if (items.length === 0) return;
-
-  // Clone items for seamless loop
-  items.forEach(item => {
-    const clone = item.cloneNode(true);
-    wrapper.appendChild(clone);
-  });
-
-  // Wait for images to load
-  const images = wrapper.querySelectorAll("img");
-  const promises = Array.from(images).map(img =>
-    img.complete ? Promise.resolve() : new Promise(resolve => {
-      img.onload = resolve;
-      img.onerror = resolve;
-    })
-  );
-
-  Promise.all(promises).then(() => {
-    requestAnimationFrame(() => {
-      const allItems = wrapper.querySelectorAll(itemSelector);
-      const itemWidth = allItems[0].offsetWidth;
-      const gap = parseFloat(getComputedStyle(wrapper).gap) || 0;
-      const visibleCount = items.length;
-
-      const scrollDistance = visibleCount * itemWidth + (visibleCount - 1) * gap;
-      const totalWidth = allItems.length * itemWidth + (allItems.length - 1) * gap;
-
-      wrapper.style.width = `${totalWidth}px`;
-
-      const animationName = "dynamic-marquee-" + Math.floor(Math.random() * 1000000); // avoid collisions
-
-      const style = document.createElement("style");
-      style.textContent = `
-        @keyframes ${animationName} {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-${scrollDistance}px); }
-        }
-
-        ${sliderSelector} .slider-wrapper {
-          animation: ${animationName} ${durationSeconds}s linear infinite;
-        }
-      `;
-      document.head.appendChild(style);
-    });
-  });
-}
-
-
-// ============================================================
-// MARQUEE INITIALIZATION
-// ============================================================
-
-function initMarqueeAnimation() {
-  document.addEventListener("DOMContentLoaded", () => {
-    const duration = 40;
-    applyDynamicMarqueeAnimation(".slider", ".slider-item", duration);
-  });
-}
 
 
 // ============================================================
@@ -3312,10 +3242,11 @@ if (!hasScrolledDown || st < threshold) return;
 // MASTER INITIALIZATION - SINGLE ENTRY POINT
 // ============================================================
 
+
 function initializeApplication() {
+    initSliderMarquee();
     initLogosLoop();
     initGsapAnimations();
-    initMarqueeAnimation();
     setupSplitTextEventListeners();
     setupLinkClicksEventHandlers();
     initNavbarShowHide();
@@ -3338,9 +3269,70 @@ function initializeApplication() {
     initImageParallax();
     initSvgAnimations();
     initImageTrail();
+    initSliderMarquee();
  
 }
 
 // SINGLE INITIALIZATION CALL
 initializeApplication();
 
+
+
+
+// ============================================================
+// INFINITE SLIDER MARQUEE ANIMATION
+// ============================================================
+
+function applyDynamicMarqueeAnimation(sliderSelector, itemSelector, durationSeconds = 40) {
+    const slider = document.querySelector(sliderSelector);
+    if (!slider) return;
+  
+    const wrapper = slider.querySelector(".slider-wrapper");
+    if (!wrapper) return;
+  
+    const items = Array.from(wrapper.querySelectorAll(itemSelector));
+    if (items.length === 0) return;
+  
+    // Clone items for seamless loop
+    items.forEach(item => {
+      const clone = item.cloneNode(true);
+      wrapper.appendChild(clone);
+    });
+  
+    // Create animation immediately without waiting for images
+    requestAnimationFrame(() => {
+      const allItems = wrapper.querySelectorAll(itemSelector);
+      const itemWidth = allItems[0].offsetWidth;
+      const gap = parseFloat(getComputedStyle(wrapper).gap) || 0;
+      const visibleCount = items.length;
+  
+      const scrollDistance = visibleCount * itemWidth + (visibleCount - 1) * gap;
+      const totalWidth = allItems.length * itemWidth + (allItems.length - 1) * gap;
+  
+      wrapper.style.width = `${totalWidth}px`;
+  
+      const animationName = "dynamic-marquee-" + Math.floor(Math.random() * 1000000);
+  
+      const style = document.createElement("style");
+      style.textContent = `
+        @keyframes ${animationName} {
+          0%   { transform: translateX(0); }
+          100% { transform: translateX(-${scrollDistance}px); }
+        }
+  
+        ${sliderSelector} .slider-wrapper {
+          animation: ${animationName} ${durationSeconds}s linear infinite;
+        }
+      `;
+      document.head.appendChild(style);
+    });
+  }
+  
+  function initSliderMarquee() {
+    // Small delay to ensure DOM is ready
+    setTimeout(() => {
+      const duration = 100;
+      applyDynamicMarqueeAnimation(".slider", ".slider-item", duration);
+    }, 100);
+  }
+        
