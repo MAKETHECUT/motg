@@ -1,15 +1,84 @@
 
+gsap.registerPlugin(SplitText, ScrollTrigger);
 
-// Must be at the very top of your script
-window.history.scrollRestoration = 'manual';
-window.scrollTo(0, 0);
-document.documentElement.scrollTop = 0;
-document.body.scrollTop = 0;
 
+
+
+// ============================================================
+// INITIAL SCROLL SETUP
+// ============================================================
+
+function initScrollRestoration() {
+  window.history.scrollRestoration = 'manual';
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = 0;
+  document.body.scrollTop = 0;
+}
+
+
+// ============================================================
+// VIMEO LAZY LOADING
+// ============================================================
+
+function initVimeoLazyLoad() {
+  // Find all Vimeo iframes
+  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]');
+  
+  if (vimeoIframes.length === 0) return;
+  
+  // Convert src to data-src for lazy loading
+  vimeoIframes.forEach(iframe => {
+    const src = iframe.getAttribute('src');
+    if (src) {
+      // Store original src in data-src
+      iframe.setAttribute('data-src', src);
+      // Remove src to prevent immediate loading
+      iframe.removeAttribute('src');
+      // Add loading indicator class
+      iframe.classList.add('vimeo-lazy');
+    }
+  });
+  
+  // Create Intersection Observer for lazy loading
+  const vimeoObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const iframe = entry.target;
+        const dataSrc = iframe.getAttribute('data-src');
+        
+        if (dataSrc) {
+          // Load the iframe
+          iframe.setAttribute('src', dataSrc);
+          // Remove data-src attribute
+          iframe.removeAttribute('data-src');
+          // Remove lazy loading class
+          iframe.classList.remove('vimeo-lazy');
+          // Stop observing this iframe
+          observer.unobserve(iframe);
+          
+          // Optional: Add loaded class for styling
+          iframe.classList.add('vimeo-loaded');
+        }
+      }
+    });
+  }, {
+    // Start loading when iframe is 800px from viewport (loads well before user sees it)
+    rootMargin: '800px 0px',
+    threshold: 0.01
+  });
+  
+  // Observe all Vimeo iframes
+  vimeoIframes.forEach(iframe => {
+    vimeoObserver.observe(iframe);
+  });
+}
+
+
+// ============================================================
+// VIDEO INITIALIZATION
+// ============================================================
 
 function initVideos() {
-  console.log('Initializing videos...'); // Debug log
-
   function convertDropboxLink(url) {
     if (!url) return '';
     
@@ -37,7 +106,6 @@ function initVideos() {
 
   // Process all videos
   const videos = document.querySelectorAll('video');
-  console.log('Found videos:', videos.length); // Debug log
 
   videos.forEach(video => {
     // Set video attributes for better playback
@@ -90,7 +158,6 @@ function initVideos() {
       
       if (entry.isIntersecting) {
         // Video is in viewport
-        console.log('Video in viewport:', video.src); // Debug log
         if (video.paused) {
           // Mobile-specific playback handling
           if (window.innerWidth < 650) {
@@ -157,38 +224,81 @@ function initVideos() {
   }
 }
 
-// Initialize videos when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
-  console.log('DOM loaded, initializing videos...'); // Debug log
-  initVideos();
-  
-  // Prioritize showreel video loading
+
+// ============================================================
+// VIDEO EVENT LISTENERS SETUP
+// ============================================================
+
+function setupVideoEventListeners() {
+  // Initialize videos when DOM is ready
+  document.addEventListener('DOMContentLoaded', () => {
+    initVideos();
+    initVideoLazyLoad();
+  });
+
+  // Re-initialize videos after page transitions
+  window.addEventListener('load', () => {
+    initVideos();
+  });
+}
+
+// ============================================================
+// VIDEO LAZY LOADING
+// ============================================================
+
+function initVideoLazyLoad() {
   const showreelVideo = document.getElementById('showreel-video');
-  if (showreelVideo) {
-    // Force video to start loading immediately
-    showreelVideo.load();
-    showreelVideo.setAttribute('preload', 'auto');
-    
-    // Add loading indicator
-    const videoContainer = showreelVideo.closest('.video-container');
-    if (videoContainer) {
-      videoContainer.classList.add('video-loading');
-    }
-  }
-});
+  if (!showreelVideo) return;
+  
+  const videoContainer = showreelVideo.closest('.video-container');
+  if (!videoContainer) return;
+  
+  // Add loading indicator
+  videoContainer.classList.add('video-loading');
+  
+  // Create intersection observer for lazy loading
+  const videoObserver = new IntersectionObserver((entries, observer) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const video = entry.target;
+        
+        // Start loading the video
+        video.setAttribute('preload', 'auto');
+        video.load();
+        
+        // Add event listeners for loading states
+        video.addEventListener('loadstart', () => {
+          videoContainer.classList.add('video-loading');
+        });
+        
+        video.addEventListener('canplay', () => {
+          videoContainer.classList.remove('video-loading');
+          videoContainer.classList.add('video-loaded');
+        });
+        
+        video.addEventListener('error', () => {
+          videoContainer.classList.remove('video-loading');
+          console.warn('Video failed to load');
+        });
+        
+        // Stop observing this video
+        observer.unobserve(video);
+      }
+    });
+  }, {
+    rootMargin: '50px 0px', // Start loading 50px before video comes into view
+    threshold: 0.1
+  });
+  
+  // Start observing the video
+  videoObserver.observe(showreelVideo);
+}
 
-// Re-initialize videos after page transitions
-window.addEventListener('load', () => {
-  console.log('Window loaded, re-initializing videos...'); // Debug log
-  initVideos();
-});
 
-// Add loading state to video containers
-document.querySelectorAll('.video-container, #video-container').forEach(container => {
-  container.classList.add('video-loading');
-});
+// ============================================================
+// VIDEO LOADING HANDLERS
+// ============================================================
 
-// Handle video loading states
 function handleVideoLoad(video) {
   const container = video.closest('.video-container, #video-container');
   if (container) {
@@ -197,40 +307,44 @@ function handleVideoLoad(video) {
   }
 }
 
-// Handle video errors
 function handleVideoError(video) {
   const container = video.closest('.video-container, #video-container');
   if (container) {
     container.classList.remove('video-loading');
     container.classList.add('video-error');
   }
-  console.error('Video error:', video.src);
 }
 
-// Process all videos
-document.querySelectorAll('video').forEach(video => {
-  // Handle video buffering
-  video.addEventListener('waiting', () => {
-    video.classList.add('buffering');
+
+// ============================================================
+// VIDEO PROCESSING
+// ============================================================
+
+function processAllVideos() {
+  document.querySelectorAll('video').forEach(video => {
+    // Handle video buffering
+    video.addEventListener('waiting', () => {
+      video.classList.add('buffering');
+    });
+    
+    video.addEventListener('playing', () => {
+      video.classList.remove('buffering');
+    });
+
+    // Handle video errors and retry
+    video.addEventListener('error', (e) => {
+      handleVideoError(video);
+    });
+
+    // Add loading handlers
+    video.addEventListener('loadeddata', () => handleVideoLoad(video));
   });
-  
-  video.addEventListener('playing', () => {
-    video.classList.remove('buffering');
-  });
+}
 
-  // Handle video errors and retry
-  video.addEventListener('error', (e) => {
-    handleVideoError(video);
-    console.error('Video error:', e);
-  });
 
-  // Add loading handlers
-  video.addEventListener('loadeddata', () => handleVideoLoad(video));
-});
-
-// Log video sources for debugging
-console.log('Video sources:', Array.from(document.querySelectorAll('video source')).map(s => s.src));
-
+// ============================================================
+// BREAKPOINT REFRESH HANDLER
+// ============================================================
 
 function refreshbreakingpoints() {
   let wasMobile = window.innerWidth < 650;
@@ -243,8 +357,11 @@ function refreshbreakingpoints() {
     }
   });
 }
-refreshbreakingpoints();
 
+
+// ============================================================
+// SPLIT TEXT ANIMATIONS
+// ============================================================
 
 function initSplitTextAnimations() {
     // Kill all existing ScrollTrigger instances first
@@ -331,7 +448,11 @@ const elements = Array.from(document.querySelectorAll(
     ScrollTrigger.refresh(true);
 }
 
-// Add this new function to handle post-transition initialization
+
+// ============================================================
+// POST-TRANSITION INITIALIZATION
+// ============================================================
+
 function initializeAfterTransition() {
     // Kill all existing ScrollTrigger instances first
     if (gsap.ScrollTrigger) {
@@ -339,72 +460,56 @@ function initializeAfterTransition() {
     }
 
     // First hide all text elements that will be animated
-const elements = Array.from(document.querySelectorAll(
-    "h1, h2, h3, h4, h5, h6, p, .btn, .nav, .footer a, .name, .role, .link-box"
-)).filter(el => !el.matches(".about-page section:nth-of-type(12) .center h1"));
+    const elements = Array.from(document.querySelectorAll(
+        "h1, h2, h3, h4, h5, h6, p, .btn, .nav, .footer a, .name, .role, .link-box"
+    )).filter(el => !el.matches(".about-page section:nth-of-type(12) .center h1"));
   
     gsap.set(elements, { visibility: "hidden" });
 
     // Force a full page reflow
     document.body.offsetHeight;
     
-    // Wait for fonts to be loaded
-    document.fonts.ready.then(() => {
-        // Force another reflow
-        document.body.offsetHeight;
-        
-        // Initialize split text with a slight delay to ensure DOM is ready
-        setTimeout(() => {
-            // Kill any existing ScrollTrigger instances again to be safe
-            if (gsap.ScrollTrigger) {
-                gsap.ScrollTrigger.getAll().forEach(trigger => trigger.kill());
-            }
-            
-            // Initialize split text animations
-            initSplitTextAnimations();
-            
-            // Force another ScrollTrigger refresh after a short delay
-            setTimeout(() => {
-                ScrollTrigger.refresh(true);
-                
-                // Additional refresh after a longer delay to ensure everything is settled
-                setTimeout(() => {
-                    ScrollTrigger.refresh(true);
-                }, 500);
-            }, 100);
-        }, 50);
-    });
+    // Note: Split text animations are initialized by setupWindowLoadHandler 
+    // after fonts are loaded - no need to duplicate here
 }
 
-// Add event listener for page transitions
-document.addEventListener('DOMContentLoaded', () => {
-    // Initial load
-    initializeAfterTransition();
-    
-    // Listen for page transitions
-    window.addEventListener('popstate', handlePopState);
 
-    // Listen for window resize to recalculate heights
-    window.addEventListener('resize', () => {
-        ScrollTrigger.refresh(true);
-    });
+// ============================================================
+// SPLIT TEXT EVENT LISTENERS SETUP
+// ============================================================
 
-    // Add scroll event listener for continuous height updates
-    let scrollTimeout;
-    window.addEventListener('scroll', () => {
-        // Clear the previous timeout
-        clearTimeout(scrollTimeout);
-        
-        // Set a new timeout to refresh after scrolling stops
-        scrollTimeout = setTimeout(() => {
-            ScrollTrigger.refresh(true);
-        }, 100);
-    }, { passive: true });
-});
+function setupSplitTextEventListeners() {
+  // Add event listener for page transitions
+  document.addEventListener('DOMContentLoaded', () => {
+      // Initial load
+      initializeAfterTransition();
+      
+      // Listen for page transitions
+      window.addEventListener('popstate', handlePopState);
+
+      // Listen for window resize to recalculate heights
+      window.addEventListener('resize', () => {
+          ScrollTrigger.refresh(true);
+      });
+
+      // Add scroll event listener for continuous height updates
+      let scrollTimeout;
+      window.addEventListener('scroll', () => {
+          // Clear the previous timeout
+          clearTimeout(scrollTimeout);
+          
+          // Set a new timeout to refresh after scrolling stops
+          scrollTimeout = setTimeout(() => {
+              ScrollTrigger.refresh(true);
+          }, 100);
+      }, { passive: true });
+  });
+}
 
 
-
-
+// ============================================================
+// SHOWREEL TOGGLE
+// ============================================================
 
 function initShowreelToggle() {
   const video = document.getElementById('showreel-video');
@@ -418,8 +523,11 @@ function initShowreelToggle() {
     isMuted = !isMuted;
   });
 }
-initShowreelToggle();
 
+
+// ============================================================
+// INFINITY GALLERY
+// ============================================================
 
 function initInfinityGallery() {
   class InfiniteHorizontalScroll {
@@ -476,14 +584,20 @@ function initInfinityGallery() {
     }
 
     bindEvents() {
-      document.addEventListener("wheel", (e) => this.handleWheel(e), { passive: false });
-      document.addEventListener("touchstart", (e) => this.handleTouchStart(e), { passive: true });
-      document.addEventListener("touchmove", (e) => this.handleTouchMove(e), { passive: false });
-      document.addEventListener("touchend", () => this.handleTouchEnd());
+      this.handleWheelBound = (e) => this.handleWheel(e);
+      this.handleTouchStartBound = (e) => this.handleTouchStart(e);
+      this.handleTouchMoveBound = (e) => this.handleTouchMove(e);
+      this.handleTouchEndBound = () => this.handleTouchEnd();
+      this.handleDragMoveBound = (e) => this.handleDragMove(e);
+      this.handleDragEndBound = () => this.handleDragEnd();
 
+      this.container.addEventListener("wheel", this.handleWheelBound, { passive: false });
+      this.container.addEventListener("touchstart", this.handleTouchStartBound, { passive: true });
+      this.container.addEventListener("touchmove", this.handleTouchMoveBound, { passive: false });
+      this.container.addEventListener("touchend", this.handleTouchEndBound);
       this.container.addEventListener("mousedown", (e) => this.handleDragStart(e));
-      window.addEventListener("mousemove", (e) => this.handleDragMove(e));
-      window.addEventListener("mouseup", () => this.handleDragEnd());
+      window.addEventListener("mousemove", this.handleDragMoveBound);
+      window.addEventListener("mouseup", this.handleDragEndBound);
     }
 
     handleWheel(event) {
@@ -547,17 +661,27 @@ function initInfinityGallery() {
       this.container.style.transform = `translateX(${-this.smoothScrollX}px)`;
       requestAnimationFrame(() => this.animate());
     }
+
+    destroy() {
+      this.container.removeEventListener("wheel", this.handleWheelBound);
+      this.container.removeEventListener("touchstart", this.handleTouchStartBound);
+      this.container.removeEventListener("touchmove", this.handleTouchMoveBound);
+      this.container.removeEventListener("touchend", this.handleTouchEndBound);
+      window.removeEventListener("mousemove", this.handleDragMoveBound);
+      window.removeEventListener("mouseup", this.handleDragEndBound);
+    }
   }
 
-  new InfiniteHorizontalScroll(document.querySelector(".gallery-wrapper"));
+  const galleries = document.querySelectorAll(".gallery-wrapper");
+  galleries.forEach(gallery => {
+    new InfiniteHorizontalScroll(gallery);
+  });
 }
 
- initInfinityGallery();
 
-
-
-
-
+// ============================================================
+// EXTRA TABS
+// ============================================================
 
 function extraTabs() {
   const cards = document.querySelectorAll('.card');
@@ -627,7 +751,11 @@ function extraTabs() {
     });
   });
 }
-extraTabs();
+
+
+// ============================================================
+// TABS ACCORDION
+// ============================================================
 
 function tabsAccordion() {
   const ANIMATION_DURATION = 0.4;
@@ -696,7 +824,11 @@ function tabsAccordion() {
     });
   });
 }
-tabsAccordion(); 
+
+
+// ============================================================
+// SVG ANIMATIONS
+// ============================================================
 
 function initSvgAnimations() {
     // ========================================
@@ -1428,31 +1560,36 @@ function initSvgAnimations() {
 
     // Initialize all animations
     initializeAllAnimations();
-} 
+}
 
 
+// ============================================================
+// GRID OVERLAY TOGGLE
+// ============================================================
 
-/* ==============================================
-Show/Hide Grid on Keypress
-============================================== */
-document.addEventListener("keydown", function (event) {
-  if (event.shiftKey && event.key === "G") {
-    const gridOverlay = document.querySelector(".grid-overlay");
-    if (gridOverlay) {
-      gridOverlay.remove();
-    } else {
-      const overlay = document.createElement("div");
-      overlay.className = "grid-overlay";
-      for (let i = 0; i < 12; i++) {
-        const column = document.createElement("div");
-        overlay.appendChild(column);
+function initGridOverlayToggle() {
+  document.addEventListener("keydown", function (event) {
+    if (event.shiftKey && event.key === "G") {
+      const gridOverlay = document.querySelector(".grid-overlay");
+      if (gridOverlay) {
+        gridOverlay.remove();
+      } else {
+        const overlay = document.createElement("div");
+        overlay.className = "grid-overlay";
+        for (let i = 0; i < 12; i++) {
+          const column = document.createElement("div");
+          overlay.appendChild(column);
+        }
+        document.body.appendChild(overlay);
       }
-      document.body.appendChild(overlay);
     }
-  }
-});
+  });
+}
 
 
+// ============================================================
+// DYNAMIC MARQUEE ANIMATION
+// ============================================================
 
 function applyDynamicMarqueeAnimation(sliderSelector, itemSelector, durationSeconds = 40) {
   const slider = document.querySelector(sliderSelector);
@@ -1509,60 +1646,34 @@ function applyDynamicMarqueeAnimation(sliderSelector, itemSelector, durationSeco
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
-  const duration = 40;
-  applyDynamicMarqueeAnimation(".slider", ".slider-item", duration);
-});
 
+// ============================================================
+// MARQUEE INITIALIZATION
+// ============================================================
 
-
-
-
-
-
-
-/* ==============================================
-Initilizing All Scripts
-============================================== */
-
-
-function initAllFunctions() {
-    // Register GSAP plugins
-    gsap.registerPlugin(SplitText, ScrollTrigger);
-      initGsapAnimations();
-      initImageParallax();
-   // initSplitTextAnimations();
-    initMegaMenu();
-
-    if (window.innerWidth >= 650) {
-        initInteractiveCursor();
-    }
-
-    initVideos();
-    initNavbarShowHide();
-    document.body.addEventListener("click", handleInternalLinkClicks);
-    window.addEventListener("popstate", handlePopState);
-
-    window.scrollTo(0, 0);
-  
-    initCustomSmoothScrolling();
-initSvgAnimations();
-initImageTrail();
+function initMarqueeAnimation() {
+  document.addEventListener("DOMContentLoaded", () => {
+    const duration = 40;
+    applyDynamicMarqueeAnimation(".slider", ".slider-item", duration);
+  });
 }
 
-window.addEventListener("load", () => {
-  requestAnimationFrame(() => {
-    document.fonts.ready.then(() => {
-      setTimeout(() => {
-        initSplitTextAnimations();
-        ScrollTrigger.refresh(true);
-       
-      }, 50);
-    });
-  });
-});
+
+// ============================================================
+// INITIALIZE ALL FUNCTIONS - REMOVED (Now using initializeApplication())
+// ============================================================
+// All initialization now happens in the single initializeApplication() function
+// at the bottom of this file. Do not add initialization calls here.
 
 
+// ============================================================
+// WINDOW LOAD HANDLER
+// ============================================================
+
+
+// ============================================================
+// IMAGE TRAIL
+// ============================================================
 
 function initImageTrail() {
     const MathUtils = {
@@ -1682,8 +1793,6 @@ function initImageTrail() {
         }
         
         showNextImage() {
-            console.log('showNextImage called - hasMouseEntered:', hasMouseEntered, 'isMouseInside:', isMouseInside);
-            
             const img = this.images[this.imgPosition];
             gsap.killTweensOf(img.DOM.el);
 
@@ -1749,6 +1858,10 @@ function initImageTrail() {
     });
 }
 
+
+// ============================================================
+// IMAGE PARALLAX
+// ============================================================
 
 function initImageParallax() {
   
@@ -1829,10 +1942,6 @@ if (window.innerWidth > 650 && !document.body.classList.contains('about-page')) 
 
 
 
-  
-  
-  gsap.registerPlugin(ScrollTrigger);
-
   [
     { sel: ".one",   y: "20vw" },
     { sel: ".two",   y: "-10vw" },
@@ -1849,9 +1958,6 @@ if (window.innerWidth > 650 && !document.body.classList.contains('about-page')) 
       }
     });
   });
-
-
-  gsap.registerPlugin(ScrollTrigger);
 
   [
     { sel: ".one",   y: "20vw" },
@@ -1954,15 +2060,22 @@ gsap.to(
 }
 
 
+// ============================================================
+// LINK CLICKS EVENT HANDLERS SETUP
+// ============================================================
+
+function setupLinkClicksEventHandlers() {
+  // Add click event listener for internal links
+  document.body.addEventListener('click', handleInternalLinkClicks);
+  
+  // Add popstate event listener for browser back/forward
+  window.addEventListener('popstate', handlePopState);
+}
 
 
-/* ==============================================
-  Link Clicks Events
-============================================== */
-document.addEventListener("DOMContentLoaded", initAllFunctions);
-
-// Add popstate event listener
-window.addEventListener('popstate', handlePopState);
+// ============================================================
+// HANDLE INTERNAL LINK CLICKS
+// ============================================================
 
 async function handleInternalLinkClicks(event) {
     const target = event.target.closest("a[href]");
@@ -1992,6 +2105,10 @@ async function handleInternalLinkClicks(event) {
     }
 }
 
+
+// ============================================================
+// PAGE TRANSITION
+// ============================================================
 
 async function pageTransition(url, isPopState = false) {
     if (window.transitioning) return;
@@ -2077,6 +2194,11 @@ async function pageTransition(url, isPopState = false) {
     }
 }
 
+
+// ============================================================
+// RESET AND REINITIALIZE
+// ============================================================
+
 function resetAndReinitialize() {
     // Kill all ScrollTrigger instances
     if (gsap.ScrollTrigger) {
@@ -2101,53 +2223,29 @@ function resetAndReinitialize() {
     document.body.offsetHeight;
 }
 
+
+// ============================================================
+// HANDLE POPSTATE
+// ============================================================
+
 function handlePopState() {
     if (!window.transitioning) {
         resetAndReinitialize();
-        // Wait for fonts to be loaded before reinitializing
-      pageTransition(window.location.href, true);
-        document.fonts.ready.then(() => {
-            // Force another reflow
-            document.body.offsetHeight;
-            
-            // Initialize split text with a slight delay to ensure DOM is ready
-            setTimeout(() => {
-                initSplitTextAnimations();
-                
-                // Force another ScrollTrigger refresh after a short delay
-                setTimeout(() => {
-                    ScrollTrigger.refresh(true);
-                }, 100);
-            }, 50);
-        });
+        // pageTransition with isPopState=true will reload the page
+        // setupWindowLoadHandler will handle split text initialization after reload
+        pageTransition(window.location.href, true);
     }
 }
 
 
-
-
-
-
-
-/* ==============================================
-Page GSAP Animations
-============================================== */
-
+// ============================================================
+// GSAP ANIMATIONS
+// ============================================================
 
 function initGsapAnimations() {
-    // Make sure ScrollTrigger is registered
-    if (!gsap.ScrollTrigger) {
-        gsap.registerPlugin(ScrollTrigger);
-    }
-  /*
-  gsap.set(".logo img", { opacity: 1 });
   
-  gsap.from(".logo img", { 
-      yPercent: 150, 
-      duration: 2, 
-      ease: "power4.inOut" 
-  });
-  */
+
+
   gsap.fromTo(".clipping-video, .symbol-about", 
   { clipPath: "inset(100% 0% 0% 0%)" }, 
   { 
@@ -2261,14 +2359,11 @@ gsap.to(visual, {
   
   
 }
-  
-  
-  
-/* ==============================================
-Infinity Mega Menu Core
-============================================== */
 
 
+// ============================================================
+// MEGA MENU CORE
+// ============================================================
 
 let megaMenuState = null;
 
@@ -2538,7 +2633,10 @@ function initMegaMenu() {
                 onComplete: () => {
                     gsap.set(megaMenuContainer, { pointerEvents: 'none' });
                     this.isTransitioning = false;
-                    if (typeof initCustomSmoothScrolling === 'function') {
+                    // Re-enable smooth scrolling without resetting scroll position
+                    if (window.customSmoothScroll && window.customSmoothScroll.restart) {
+                        window.customSmoothScroll.restart();
+                    } else if (typeof initCustomSmoothScrolling === 'function') {
                         initCustomSmoothScrolling();
                     }
                 }
@@ -2630,46 +2728,53 @@ megaMenuContainer.addEventListener('touchend', () => {
 
 
 
-document.addEventListener('DOMContentLoaded', () => {
-    initMegaMenu();
-    const menuToggle = document.querySelector('.menu-toggle');
-    if (menuToggle) {
-        menuToggle.addEventListener('click', () => {
-            if (megaMenuState) {
-                megaMenuState.toggle(menuToggle);
-                menuToggle.classList.toggle('clicked');
-            }
-        });
-    }
-});
+// ============================================================
+// MEGA MENU EVENT LISTENERS SETUP
+// ============================================================
 
-window.addEventListener('resize', () => {
-    if (megaMenuState && typeof megaMenuState.refresh === 'function') {
-        megaMenuState.refresh('Home');
-    }
-});
-  
-  
+function setupMegaMenuEventListeners() {
+  document.addEventListener('DOMContentLoaded', () => {
+      initMegaMenu();
+      const menuToggle = document.querySelector('.menu-toggle');
+      if (menuToggle) {
+          menuToggle.addEventListener('click', () => {
+              if (megaMenuState) {
+                  megaMenuState.toggle(menuToggle);
+                  menuToggle.classList.toggle('clicked');
+              }
+          });
+      }
+  });
 
-
-
-
-
-
-
-
-/* ==============================================
-Logos Loop
-============================================== */
-
-const track = document.querySelector('.logos-track');
-track.innerHTML += track.innerHTML;
+  window.addEventListener('resize', () => {
+      if (megaMenuState && typeof megaMenuState.refresh === 'function') {
+          megaMenuState.refresh('Home');
+      }
+  });
+}
 
 
 
-/* ==============================================
-Custom Smooth Scrolling
-============================================== */
+
+
+
+
+
+// ============================================================
+// LOGOS LOOP
+// ============================================================
+
+function initLogosLoop() {
+  const track = document.querySelector('.logos-track');
+  if (track) {
+    track.innerHTML += track.innerHTML;
+  }
+}
+
+
+// ============================================================
+// CUSTOM SMOOTH SCROLLING
+// ============================================================
 
 
 
@@ -2884,9 +2989,10 @@ function initCustomSmoothScrolling() {
         }
 
         forceScrollUpdate() {
-            this.targetScroll = 0;
-            this.currentScroll = 0;
-            window.scrollTo(0, 0);
+            // Get current scroll position instead of resetting to 0
+            const currentScrollY = window.scrollY || window.pageYOffset || 0;
+            this.targetScroll = currentScrollY;
+            this.currentScroll = currentScrollY;
         }
 
         smoothScrollLoop() {
@@ -2927,10 +3033,11 @@ function initCustomSmoothScrolling() {
         }
 
         restart() {
-            this.targetScroll = 0;
-            this.currentScroll = 0;
+            // Preserve current scroll position
+            const currentScrollY = window.scrollY || window.pageYOffset;
+            this.targetScroll = currentScrollY;
+            this.currentScroll = currentScrollY;
             this.velocity = 0;
-            window.scrollTo(0, 0);
         }
 
         destroy() {
@@ -2950,12 +3057,17 @@ function initCustomSmoothScrolling() {
         }
     }
 
-    new CustomSmoothScroll();
+    // Store instance globally so it can be restarted without resetting scroll
+    if (window.customSmoothScroll && window.customSmoothScroll.destroy) {
+        window.customSmoothScroll.destroy();
+    }
+    window.customSmoothScroll = new CustomSmoothScroll();
 }
-  
 
 
-
+// ============================================================
+// INTERACTIVE CURSOR
+// ============================================================
 
 function initInteractiveCursor() {
     if (window.innerWidth <= 650) return;
@@ -3119,101 +3231,9 @@ document.querySelectorAll(".video-visual").forEach(el => {
 
 
 
-
-/* ==============================================
-Hide Content Until Loaded
-============================================== */
-document.body.style.visibility = "hidden";
-document.body.style.opacity = "0";
-
-window.addEventListener("load", function () {
-    // Priority: Wait for showreel video to be ready first
-    const showreelVideo = document.getElementById('showreel-video');
-    const showreelPromise = new Promise(resolve => {
-        if (showreelVideo) {
-            if (showreelVideo.readyState >= 3) {
-                resolve();
-            } else {
-                // Add timeout fallback (10 seconds max wait)
-                const timeout = setTimeout(() => {
-                    console.log('Showreel video loading timeout, continuing...');
-                    resolve();
-                }, 10000);
-                
-                showreelVideo.addEventListener('canplay', () => {
-                    clearTimeout(timeout);
-                    resolve();
-                });
-                showreelVideo.addEventListener('error', () => {
-                    clearTimeout(timeout);
-                    resolve();
-                });
-            }
-        } else {
-            resolve(); // No showreel video, continue
-        }
-    });
-
-    // Wait for all images to load
-    const images = document.querySelectorAll('img');
-    const imagePromises = Array.from(images).map(img => {
-        if (img.complete) return Promise.resolve();
-        return new Promise(resolve => {
-            img.onload = resolve;
-            img.onerror = resolve; // Resolve even on error to not block loading
-        });
-    });
-
-    // Wait for all other videos to load
-    const videos = document.querySelectorAll('video:not(#showreel-video)');
-    const videoPromises = Array.from(videos).map(video => {
-        if (video.readyState >= 3) return Promise.resolve();
-        return new Promise(resolve => {
-            video.oncanplay = resolve;
-            video.onerror = resolve;
-        });
-    });
-
-    // Wait for GSAP and SplitText to be fully loaded
-    const gsapPromise = new Promise(resolve => {
-        if (typeof gsap !== 'undefined' && typeof SplitText !== 'undefined') {
-            resolve();
-        } else {
-            const checkInterval = setInterval(() => {
-                if (typeof gsap !== 'undefined' && typeof SplitText !== 'undefined') {
-                    clearInterval(checkInterval);
-                    resolve();
-                }
-            }, 100);
-        }
-    });
-
-    // Wait for showreel video first, then all other resources
-    Promise.all([showreelPromise, ...imagePromises, ...videoPromises, gsapPromise]).then(() => {
-        // Initialize split text animations first
-      
-        
-        // Show content with a smooth transition
-        gsap.to(document.body, {
-            visibility: "visible",
-            opacity: 1,
-            duration: 0.5,
-            ease: "power2.out",
-            onComplete: () => {
-                // Start animations after content is visible
-                gsap.set(".logo img", { opacity: 1 });
-                gsap.from(".logo img", { 
-                    yPercent: 0, 
-                    duration: 2, 
-                    ease: "power4.inOut" 
-                });
-            }
-        });
-    });
-});
-
-
-
+// ============================================================
+// NAVBAR SHOW/HIDE
+// ============================================================
 
 function initNavbarShowHide() {
     const navElements = document.querySelectorAll(".header");
@@ -3286,6 +3306,41 @@ if (!hasScrolledDown || st < threshold) return;
         }
     };
 }
-  
 
+
+// ============================================================
+// MASTER INITIALIZATION - SINGLE ENTRY POINT
+// ============================================================
+
+function initializeApplication() {
+    initLogosLoop();
+    initGsapAnimations();
+    initMarqueeAnimation();
+    setupSplitTextEventListeners();
+    setupLinkClicksEventHandlers();
+    initNavbarShowHide();
+    processAllVideos();
+    initScrollRestoration();
+    initVimeoLazyLoad();
+    setupMegaMenuEventListeners();
+    initCustomSmoothScrolling();
+  setTimeout(() => {
+    initSplitTextAnimations();
+  }, 1000);
+    initInteractiveCursor();
+    refreshbreakingpoints();
+    initShowreelToggle();
+    initInfinityGallery();
+    extraTabs();
+    tabsAccordion();
+    initGridOverlayToggle();
+    setupVideoEventListeners();
+    initImageParallax();
+    initSvgAnimations();
+    initImageTrail();
+ 
+}
+
+// SINGLE INITIALIZATION CALL
+initializeApplication();
 
