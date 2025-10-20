@@ -1166,7 +1166,7 @@ iframe {
   height: 100%;
   z-index: -1;
   cursor: pointer;
-  background:var(--bordo);
+  background:var(--black);
 }
 
 
