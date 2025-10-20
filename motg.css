@@ -1128,16 +1128,30 @@ section:not(.hero):not(:has(.footer)) {
 }
 
 
-video {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    transform-origin: center center;
-    object-fit: cover;
-    width: 100%;
-    min-height: 100%;
-    z-index:99;
+.hero iframe {
+  pointer-events: none;
+}
+.vimeo-wrapper {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 99;
+  pointer-events: none;
+  overflow: hidden;
+}
+.vimeo-wrapper iframe {
+  width: 100vw;
+  height: 56.25vw; /* Given a 16:9 aspect ratio, 9/16*100 = 56.25 */
+  min-height: 100vh;
+  min-width: 177.77vh; /* Given a 16:9 aspect ratio, 16/9*100 = 177.77 */
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 99;
 }
 
 
@@ -1147,27 +1161,11 @@ video {
   left: 0;
   width: 100%;
   height: 100%;
-  z-index: 10;
+  z-index: -1;
   cursor: pointer;
   background:black;
 }
 
-
-.hero .video-visual img {
-	height: 100%;
-	width: 100%;
-	object-fit: cover;
-  background: var(--black)!important;
-}
-
-
-.w-background-video {
-	position: relative!important;
-	z-index: 9999999999!important;
-	height: 100vh!important;
-	width: 100%!important;
-	object-fit: cover!important;
-}
 
 
 .w-background-video--control {
