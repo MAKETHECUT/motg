@@ -1154,6 +1154,9 @@ section:not(.hero):not(:has(.footer)) {
   z-index: 99;
 }
 
+iframe {
+  pointer-events: none;
+}
 
 #showreel-overlay {
   position: absolute;
