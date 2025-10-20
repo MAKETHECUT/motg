@@ -21,8 +21,8 @@ function initScrollRestoration() {
 // ============================================================
 
 function initVimeoLazyLoad() {
-  // Find all Vimeo iframes
-  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]');
+  // Find all Vimeo iframes except the hero video (showreel-video)
+  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
   
   if (vimeoIframes.length === 0) return;
   
@@ -39,31 +39,45 @@ function initVimeoLazyLoad() {
     }
   });
   
-  // Create Intersection Observer for lazy loading
-  const vimeoObserver = new IntersectionObserver((entries, observer) => {
+  // Create Intersection Observer for lazy loading and playback control
+  const vimeoObserver = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
+      const iframe = entry.target;
+      
       if (entry.isIntersecting) {
-        const iframe = entry.target;
+        // Video is entering viewport
         const dataSrc = iframe.getAttribute('data-src');
         
         if (dataSrc) {
-          // Load the iframe
+          // Load the iframe for first time
           iframe.setAttribute('src', dataSrc);
           // Remove data-src attribute
           iframe.removeAttribute('data-src');
           // Remove lazy loading class
           iframe.classList.remove('vimeo-lazy');
-          // Stop observing this iframe
-          observer.unobserve(iframe);
-          
-          // Optional: Add loaded class for styling
+          // Add loaded class for styling
           iframe.classList.add('vimeo-loaded');
+          
+          // Initialize Vimeo Player API for this iframe
+          if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
+            iframe.vimeoPlayer = new Vimeo.Player(iframe);
+          }
+        } else if (iframe.classList.contains('vimeo-loaded')) {
+          // Video was already loaded, just play it
+          if (iframe.vimeoPlayer) {
+            iframe.vimeoPlayer.play().catch(() => {});
+          }
+        }
+      } else {
+        // Video is leaving viewport - pause to save memory
+        if (iframe.classList.contains('vimeo-loaded') && iframe.vimeoPlayer) {
+          iframe.vimeoPlayer.pause().catch(() => {});
         }
       }
     });
   }, {
-    // Start loading when iframe is 800px from viewport (loads well before user sees it)
-    rootMargin: '800px 0px',
+    // Start loading when iframe is 2000px from viewport (loads well before user sees it)
+    rootMargin: '2000px 0px',
     threshold: 0.01
   });
   
