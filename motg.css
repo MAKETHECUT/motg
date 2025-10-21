@@ -421,6 +421,7 @@ strong {
 		content: "Play";
 		opacity: 1;
 	}
+    
 	#cursor.pause .cursor__circle {
 		transform: scale(1);
 	}
@@ -435,6 +436,14 @@ strong {
 	}
 	#cursor.hiding .cursor__circle {
 		opacity: 0 !important;
+	}
+
+    #cursor.soon .cursor__circle {
+		transform: scale(1);
+	}
+	#cursor.soon .cursor__circle::before {
+		content: "Soon";
+		opacity: 1;
 	}
   
 }
@@ -3279,5 +3288,3 @@ Thank You Page
   margin: auto;
   width: fit-content;
 }
-
-
