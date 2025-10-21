@@ -3119,6 +3119,11 @@ function initInteractiveCursor() {
         el.addEventListener("mouseleave", () => cursor.classList.remove("enter"));
     });
 
+    document.querySelectorAll(".click-disable").forEach(el => {
+        el.addEventListener("mouseenter", () => cursor.classList.add("soon"));
+        el.addEventListener("mouseleave", () => cursor.classList.remove("soon"));
+    });
+
 document.querySelectorAll(".video-visual").forEach(el => {
     el.addEventListener("mouseenter", () => {
         cursor.classList.add("play");
