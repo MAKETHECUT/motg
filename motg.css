@@ -1,5 +1,5 @@
 /* ==============================================
-     VIMEO LAZY LOADING - MOBILE FIRST
+     OPTIMIZED VIDEO MANAGEMENT SYSTEM
 ============================================== */
 
 /* Base lazy loading styles */
@@ -35,6 +35,210 @@
   background: transparent;
 }
 
+/* Video container optimizations */
+.video-container {
+  position: relative;
+  overflow: hidden;
+}
+
+.video-container.video-loading {
+  background: #f0f0f0;
+}
+
+.video-container.video-loading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+.video-container.video-loaded {
+  background: transparent;
+}
+
+.video-container.show-play-button::after {
+  content: '▶';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 24px;
+  color: white;
+  background: rgba(0, 0, 0, 0.7);
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3;
+}
+
+/* Video buffering indicator */
+video.buffering {
+  opacity: 0.7;
+}
+
+video.buffering::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid var(--red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+/* Video preview image styles */
+.video-preview {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.video-preview.hidden {
+  opacity: 0;
+  display: none;
+}
+
+/* Ensure preview images are always visible when videos are not loaded */
+.vimeo-lazy + .video-preview,
+.video-wrapper:not(.video-loaded) .video-preview {
+  opacity: 1;
+  display: block;
+}
+
+/* Hide preview when video is loaded and playing */
+.video-loaded .video-preview,
+.video-playing .video-preview {
+  opacity: 0;
+  display: none;
+}
+
+/* Work thumbnail preview optimization */
+.work-thumbnail .image-wrapper {
+  position: relative;
+  overflow: hidden;
+}
+
+.work-thumbnail .work-img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 1;
+  transition: opacity 0.3s ease;
+}
+
+.work-thumbnail iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 2;
+}
+
+/* Show preview image when iframe is lazy loaded */
+.work-thumbnail iframe.vimeo-lazy + .work-img {
+  opacity: 1;
+  z-index: 1;
+}
+
+/* Hide preview image when iframe is loaded */
+.work-thumbnail iframe.vimeo-loaded + .work-img {
+  opacity: 0;
+  z-index: 0;
+}
+
+/* Ensure preview images are visible by default */
+.video-wrapper,
+.video-container,
+.image-wrapper {
+  position: relative;
+}
+
+.video-wrapper iframe,
+.video-container iframe {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.video-wrapper iframe.vimeo-loaded,
+.video-container iframe.vimeo-loaded {
+  opacity: 1;
+}
+
+/* Preloading states for smoother transitions */
+.vimeo-preloading {
+  opacity: 0.3;
+  transition: opacity 0.5s ease;
+}
+
+.vimeo-preloading::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid var(--red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+.video-preloading {
+  opacity: 0.3;
+  transition: opacity 0.5s ease;
+}
+
+.video-preloading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 30px;
+  height: 30px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid var(--red);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  z-index: 2;
+}
+
+/* Smooth transition from preloading to playing */
+.video-loaded,
+.vimeo-loaded {
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
 /* Mobile-specific optimizations */
 @media (max-width: 767px) {
   .vimeo-mobile {
@@ -49,6 +253,7 @@
     height: 30px;
     border-width: 2px;
   }
+  
 }
 
 /* Low-end device optimizations */
@@ -326,7 +531,6 @@ figure {
 	-khtml-user-drag: none;
 	-moz-user-drag: none;
 	-o-user-drag: none;
-	user-drag: none;
 }
 
 h1,
@@ -1697,6 +1901,11 @@ footer {
   padding-bottom: 10svh;
 }
 
+.project-cover {
+  padding: var(--desktop-padding);
+  margin: auto;
+}
+
 .indicator {
   display: flex;
   flex-direction: column;
@@ -1805,6 +2014,7 @@ Project Page
   width: var(--desktop-width);
 /*  height: 48.145vw;*/
   cursor:pointer;
+  margin: 5vw 0;
 }
 
 .gallery-wrapper {
@@ -1814,9 +2024,9 @@ Project Page
 }
 
 .gallery-item {
-  flex: 0 0 35vw;
-  height: 48.145vw;
-  min-width: 85.59vw;
+
+  height: fit-content;
+  min-width: 85vw;
 }
 
 .gallery-item img {
@@ -1880,7 +2090,17 @@ Project Page
     justify-content: start;
     width:100%;
   }
+  
+  .work-content {
+    padding: var(--mobile-padding);
+    width: var(--mobile-width);
+  }
 
+  .gallery {
+     margin: 8vw 0;
+   }
+
+   
   .text-section {
     padding: 18vw 0!important;
   }
@@ -1912,15 +2132,14 @@ Project Page
   .image-wrapper, .video-wrapper {
     overflow: hidden;
 /*    height: 47.251vw;*/
-min-height: fit-content;
+    min-height: fit-content;
     position:relative;
   }
 
   
   .more-work .image-wrapper {
     width: 100%;
-/*    height: 47.251vw;*/
-    min-height: fit-content;
+    height: 47.251vw;
   }
   
   .more-work .work-thumbnail {
