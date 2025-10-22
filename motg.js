@@ -607,7 +607,7 @@ const elements = Array.from(document.querySelectorAll(
             opacity: 1,
             stagger: 0.12,
             duration: 1.5,
-            delay: element.closest(".hero, .hero-wait") ? 0.3 : 0,
+            delay: element.closest(".hero, .hero-wait") ? 0 : 0,
             ease: "power4.out"
         });
     });
@@ -3409,7 +3409,7 @@ function initializeApplication() {
     initCustomSmoothScrolling();
   setTimeout(() => {
     initSplitTextAnimations();
-  }, 1000);
+  }, 800);
     initInteractiveCursor();
     refreshbreakingpoints();
     initShowreelToggle();
@@ -3421,7 +3421,6 @@ function initializeApplication() {
     initImageParallax();
     initSvgAnimations();
     initImageTrail();
-    initSliderMarquee();
  
 }
 
