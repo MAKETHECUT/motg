@@ -1803,7 +1803,7 @@ Project Page
 .gallery {
  /* overflow: hidden;*/
   width: var(--desktop-width);
-  height: 48.145vw;
+/*  height: 48.145vw;*/
   cursor:pointer;
 }
 
@@ -1911,14 +1911,16 @@ Project Page
   
   .image-wrapper, .video-wrapper {
     overflow: hidden;
-    height: 47.251vw;
+/*    height: 47.251vw;*/
+min-height: fit-content;
     position:relative;
   }
 
   
   .more-work .image-wrapper {
     width: 100%;
-    height: 47.251vw;
+/*    height: 47.251vw;*/
+    min-height: fit-content;
   }
   
   .more-work .work-thumbnail {
