@@ -303,8 +303,8 @@ function initInfinityGallery() {
         this.galleryTop = rect.top + window.scrollY;
         this.galleryHeight = rect.height;
         
-        // Reset scroll progress when recalculating
-        this.scrollProgress = 0;
+        // Preserve current scroll progress instead of resetting
+        // This prevents the gallery from jumping back to start when page is scrolled
     }
 
     handleScroll() {
@@ -337,7 +337,9 @@ function initInfinityGallery() {
         this.startY = e.clientY || e.touches[0].clientY;
         this.startTime = Date.now();
         // Store current position when starting manual drag
-        this.manualDragOffset = this.x;
+        // Use the current scroll progress as the starting point for manual drag
+        this.manualDragOffset = this.isManualDrag ? this.progress : this.scrollProgress;
+        this.progress = this.manualDragOffset;
     }
 
     handleMove(e) {
