@@ -17,8 +17,54 @@ function initScrollRestoration() {
 
 
 // ============================================================
-// VIMEO LAZY LOADING
+// VIMEO LAZY LOADING - MOBILE FIRST APPROACH
 // ============================================================
+
+// Mobile optimization utilities
+function getMobileOptimizations() {
+  const isMobile = window.innerWidth < 768;
+  const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
+  const isSlowConnection = navigator.connection && 
+    (navigator.connection.effectiveType === 'slow-2g' || 
+     navigator.connection.effectiveType === '2g' ||
+     navigator.connection.saveData);
+  
+  return {
+    isMobile,
+    isLowEndDevice,
+    isSlowConnection,
+    quality: isLowEndDevice ? '360p' : (isMobile ? '480p' : '720p'),
+    autoplay: !isMobile || document.hasUserInteracted,
+    preload: isMobile ? 'metadata' : 'auto'
+  };
+}
+
+// Enhanced Vimeo URL optimization for mobile
+function optimizeVimeoUrl(originalUrl, optimizations) {
+  let optimizedUrl = originalUrl;
+  const separator = originalUrl.includes('?') ? '&' : '?';
+  
+  // Add mobile-specific parameters
+  const params = [];
+  
+  if (optimizations.isMobile) {
+    params.push(`quality=${optimizations.quality}`);
+    params.push('autopause=1');
+    params.push('autoplay=0');
+    params.push('muted=1'); // Start muted for better mobile experience
+  }
+  
+  if (optimizations.isSlowConnection) {
+    params.push('quality=360p'); // Force lower quality for slow connections
+    params.push('preload=none'); // Don't preload on slow connections
+  }
+  
+  if (params.length > 0) {
+    optimizedUrl += separator + params.join('&');
+  }
+  
+  return optimizedUrl;
+}
 
 function initVimeoLazyLoad() {
   // Find all Vimeo iframes except the hero video (showreel-video)
@@ -26,7 +72,10 @@ function initVimeoLazyLoad() {
   
   if (vimeoIframes.length === 0) return;
   
-  // Convert src to data-src for lazy loading
+  // Get mobile optimizations
+  const optimizations = getMobileOptimizations();
+  
+  // Convert src to data-src for lazy loading with mobile optimizations
   vimeoIframes.forEach(iframe => {
     const src = iframe.getAttribute('src');
     if (src) {
@@ -36,8 +85,25 @@ function initVimeoLazyLoad() {
       iframe.removeAttribute('src');
       // Add loading indicator class
       iframe.classList.add('vimeo-lazy');
+      
+      // Add mobile-specific optimizations
+      if (optimizations.isMobile) {
+        iframe.classList.add('vimeo-mobile');
+      }
+      if (optimizations.isLowEndDevice) {
+        iframe.classList.add('vimeo-low-end');
+      }
+      if (optimizations.isSlowConnection) {
+        iframe.classList.add('vimeo-slow-connection');
+      }
     }
   });
+  
+  // Mobile-first intersection observer settings
+  const observerOptions = {
+    rootMargin: optimizations.isMobile ? '500px 0px' : '1000px 0px', // Smaller margin on mobile
+    threshold: optimizations.isMobile ? 0.1 : 0.01 // Higher threshold on mobile for better performance
+  };
   
   // Create Intersection Observer for lazy loading and playback control
   const vimeoObserver = new IntersectionObserver((entries) => {
@@ -49,8 +115,10 @@ function initVimeoLazyLoad() {
         const dataSrc = iframe.getAttribute('data-src');
         
         if (dataSrc) {
-          // Load the iframe for first time
-          iframe.setAttribute('src', dataSrc);
+          // Load the iframe for first time with mobile optimizations
+          const optimizedSrc = optimizeVimeoUrl(dataSrc, optimizations);
+          
+          iframe.setAttribute('src', optimizedSrc);
           // Remove data-src attribute
           iframe.removeAttribute('data-src');
           // Remove lazy loading class
@@ -58,33 +126,119 @@ function initVimeoLazyLoad() {
           // Add loaded class for styling
           iframe.classList.add('vimeo-loaded');
           
-          // Initialize Vimeo Player API for this iframe
+          // Initialize Vimeo Player API for this iframe with mobile optimizations
           if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
             iframe.vimeoPlayer = new Vimeo.Player(iframe);
+            
+            // Set mobile-specific player options
+            if (optimizations.isMobile) {
+              iframe.vimeoPlayer.setVolume(0.5); // Lower default volume on mobile
+            }
           }
         } else if (iframe.classList.contains('vimeo-loaded')) {
-          // Video was already loaded, just play it
+          // Video was already loaded, just play it (with mobile considerations)
           if (iframe.vimeoPlayer) {
-            iframe.vimeoPlayer.play().catch(() => {});
+            // On mobile, only autoplay if user has interacted with the page
+            if (!optimizations.isMobile || document.hasUserInteracted) {
+              iframe.vimeoPlayer.play().catch(() => {});
+            }
           }
         }
       } else {
-        // Video is leaving viewport - pause to save memory
+        // Video is leaving viewport - pause and cleanup to save memory
         if (iframe.classList.contains('vimeo-loaded') && iframe.vimeoPlayer) {
           iframe.vimeoPlayer.pause().catch(() => {});
+          
+          // On mobile and low-end devices, unload the iframe to save memory
+          if (optimizations.isMobile || optimizations.isLowEndDevice) {
+            // Store the src before removing
+            const currentSrc = iframe.getAttribute('src');
+            if (currentSrc) {
+              iframe.setAttribute('data-src', currentSrc);
+              iframe.removeAttribute('src');
+              iframe.classList.add('vimeo-lazy');
+              iframe.classList.remove('vimeo-loaded');
+              
+              // Clean up the player instance
+              if (iframe.vimeoPlayer) {
+                iframe.vimeoPlayer.destroy().catch(() => {});
+                iframe.vimeoPlayer = null;
+              }
+            }
+          }
         }
       }
     });
-  }, {
-    // Start loading when iframe is 2000px from viewport (loads well before user sees it)
-    rootMargin: '2000px 0px',
-    threshold: 0.01
-  });
+  }, observerOptions);
   
   // Observe all Vimeo iframes
   vimeoIframes.forEach(iframe => {
     vimeoObserver.observe(iframe);
   });
+  
+  // Track user interaction for mobile autoplay
+  if (optimizations.isMobile) {
+    const trackUserInteraction = () => {
+      document.hasUserInteracted = true;
+      document.removeEventListener('touchstart', trackUserInteraction);
+      document.removeEventListener('click', trackUserInteraction);
+    };
+    
+    document.addEventListener('touchstart', trackUserInteraction, { once: true });
+    document.addEventListener('click', trackUserInteraction, { once: true });
+  }
+  
+  // Memory management for mobile devices
+  if (optimizations.isMobile || optimizations.isLowEndDevice) {
+    // Monitor memory usage and cleanup if needed
+    const memoryMonitor = () => {
+      if (performance.memory) {
+        const usedMemory = performance.memory.usedJSHeapSize;
+        const totalMemory = performance.memory.totalJSHeapSize;
+        const memoryUsage = usedMemory / totalMemory;
+        
+        // If memory usage is high, force cleanup of all off-screen videos
+        if (memoryUsage > 0.8) {
+          vimeoIframes.forEach(iframe => {
+            if (!iframe.classList.contains('vimeo-loaded')) return;
+            
+            const rect = iframe.getBoundingClientRect();
+            const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+            
+            if (!isInViewport && iframe.vimeoPlayer) {
+              iframe.vimeoPlayer.pause().catch(() => {});
+              iframe.vimeoPlayer.destroy().catch(() => {});
+              iframe.vimeoPlayer = null;
+              
+              // Unload the iframe
+              const currentSrc = iframe.getAttribute('src');
+              if (currentSrc) {
+                iframe.setAttribute('data-src', currentSrc);
+                iframe.removeAttribute('src');
+                iframe.classList.add('vimeo-lazy');
+                iframe.classList.remove('vimeo-loaded');
+              }
+            }
+          });
+        }
+      }
+    };
+    
+    // Check memory usage every 30 seconds on mobile
+    setInterval(memoryMonitor, 30000);
+    
+    // Also check on page visibility change
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        // Page is hidden, pause all videos to save battery
+        vimeoIframes.forEach(iframe => {
+          if (iframe.vimeoPlayer && iframe.classList.contains('vimeo-loaded')) {
+            iframe.vimeoPlayer.pause().catch(() => {});
+          }
+        });
+      }
+    });
+  }
 }
 
 
@@ -544,153 +698,122 @@ function initShowreelToggle() {
 // ============================================================
 
 function initInfinityGallery() {
-  class InfiniteHorizontalScroll {
-    constructor(container) {
-      if (!container) return;
-      this.container = container;
-      this.items = Array.from(this.container.children);
-      if (this.items.length === 0) return;
-
-      this.scrollX = 0;
-      this.smoothScrollX = 0;
-      this.touchStartX = 0;
-      this.isDragging = false;
-      this.dragStartX = 0;
-      this.dragDelta = 0;
-
-      this.cloneItems();
-      this.calculateDimensions();
-      this.init();
-    }
-
-    cloneItems() {
-      const fragmentBefore = document.createDocumentFragment();
-      const fragmentAfter = document.createDocumentFragment();
-      this.items.forEach((item) => {
-        const cloneBefore = item.cloneNode(true);
-        const cloneAfter = item.cloneNode(true);
-        fragmentBefore.appendChild(cloneBefore);
-        fragmentAfter.appendChild(cloneAfter);
-      });
-      this.container.insertBefore(fragmentBefore, this.container.firstChild);
-      this.container.appendChild(fragmentAfter);
-    }
-
-    calculateDimensions() {
-      this.totalWidth = 0;
-      Array.from(this.container.children).forEach((item) => {
-        const itemWidth = item.getBoundingClientRect().width;
-        const itemMarginRight = parseFloat(getComputedStyle(item).marginRight);
-        this.totalWidth += itemWidth + itemMarginRight;
-      });
-      const originalWidth = this.totalWidth / 3;
-      this.scrollX = originalWidth;
-      this.smoothScrollX = originalWidth;
-      this.container.style.transform = `translateX(${-this.scrollX}px)`;
+  class DragScroll {
+    constructor(obj) {
+        this.el = typeof obj.el === 'string' ? document.querySelector(obj.el) : obj.el;
+        this.wrap = this.el.querySelector(obj.wrap);
+        this.items = this.el.querySelectorAll(obj.item);
+        this.dragThreshold = 5;
+        this.isDragging = false;
+        this.isMouseDown = false;
+        this.startX = 0;
+        this.startY = 0;
+        this.isHorizontalDrag = false;
+        this.startTime = 0;
+        this.init();
     }
 
     init() {
-      this.bindEvents();
-      this.animate();
-      window.addEventListener("resize", () => {
-        this.calculateDimensions();
-      });
+        this.progress = 0;
+        this.x = 0;
+        this.bindEvents();
+        this.calculate();
+        this.raf();
     }
 
     bindEvents() {
-      this.handleWheelBound = (e) => this.handleWheel(e);
-      this.handleTouchStartBound = (e) => this.handleTouchStart(e);
-      this.handleTouchMoveBound = (e) => this.handleTouchMove(e);
-      this.handleTouchEndBound = () => this.handleTouchEnd();
-      this.handleDragMoveBound = (e) => this.handleDragMove(e);
-      this.handleDragEndBound = () => this.handleDragEnd();
-
-      this.container.addEventListener("wheel", this.handleWheelBound, { passive: false });
-      this.container.addEventListener("touchstart", this.handleTouchStartBound, { passive: true });
-      this.container.addEventListener("touchmove", this.handleTouchMoveBound, { passive: false });
-      this.container.addEventListener("touchend", this.handleTouchEndBound);
-      this.container.addEventListener("mousedown", (e) => this.handleDragStart(e));
-      window.addEventListener("mousemove", this.handleDragMoveBound);
-      window.addEventListener("mouseup", this.handleDragEndBound);
+        window.addEventListener("resize", this.calculate.bind(this));
+        this.el.addEventListener("mousedown", (e) => this.handleStart(e));
+        window.addEventListener("mousemove", (e) => this.handleMove(e));
+        window.addEventListener("mouseup", (e) => this.handleEnd(e));
+        this.el.addEventListener("touchstart", (e) => this.handleStart(e));
+        window.addEventListener("touchmove", (e) => this.handleMove(e));
+        window.addEventListener("touchend", (e) => this.handleEnd(e));
+        this.el.addEventListener("dragstart", (e) => this.preventDragOnLinks(e));
     }
 
-    handleWheel(event) {
-      if (event.target.closest("button, input, textarea, select")) return;
-      event.preventDefault();
-      this.scrollX += event.deltaY * 1.5;
-      this.handleInfiniteScroll();
+    calculate() {
+        this.wrapWidth = this.wrap.scrollWidth;
+        this.containerWidth = this.el.clientWidth;
+        const lastItem = this.items[this.items.length - 1];
+        const lastItemRight = lastItem.offsetLeft + lastItem.offsetWidth;
+        this.maxScroll = lastItemRight - this.el.clientWidth;
     }
 
-    handleTouchStart(event) {
-      this.touchStartX = event.touches[0].clientX;
-      this.touchStartY = event.touches[0].clientY;
-      this.dragDelta = 0;
+    handleStart(e) {
+        this.isDragging = false;
+        this.isMouseDown = true;
+        this.isHorizontalDrag = false;
+        this.startX = e.clientX || e.touches[0].clientX;
+        this.startY = e.clientY || e.touches[0].clientY;
+        this.startTime = Date.now();
     }
 
-    handleTouchMove(event) {
-      event.preventDefault();
-      if (window.innerWidth < 750) {
-        const touchX = event.touches[0].clientX;
-        const deltaX = touchX - this.touchStartX;
-        this.scrollX -= deltaX * 2;
-        this.touchStartX = touchX;
-        this.handleInfiniteScroll();
-      }
+    handleMove(e) {
+        if (!this.isMouseDown) return;
+
+        const currentX = e.clientX || e.touches[0].clientX;
+        const currentY = e.clientY || e.touches[0].clientY;
+
+        const deltaX = currentX - this.startX;
+        const deltaY = currentY - this.startY;
+
+        if (!this.isHorizontalDrag) {
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > this.dragThreshold) {
+                this.isHorizontalDrag = true;
+            } else if (Math.abs(deltaY) > this.dragThreshold) {
+                return;
+            }
+        }
+
+        if (this.isHorizontalDrag) {
+            e.preventDefault();
+            this.isDragging = true;
+            this.progress += -deltaX * 3.819;
+            this.startX = currentX;
+            this.startY = currentY;
+            this.move();
+        }
     }
 
-    handleTouchEnd() {
-      this.dragDelta = 0;
+    handleEnd(e) {
+        this.isMouseDown = false;
+        if (this.isDragging) {
+            this.isDragging = false;
+            return;
+        }
     }
 
-    handleDragStart(e) {
-      this.isDragging = true;
-      this.dragStartX = e.clientX;
+    preventDragOnLinks(e) {
+        if (e.target.tagName === "A") {
+            e.preventDefault();
+        }
     }
 
-    handleDragMove(e) {
-      if (!this.isDragging) return;
-      const deltaX = e.clientX - this.dragStartX;
-      this.dragStartX = e.clientX;
-      this.scrollX -= deltaX * 4;
-      this.handleInfiniteScroll();
+    move() {
+        this.progress = Math.max(0, Math.min(this.progress, this.maxScroll));
     }
 
-    handleDragEnd() {
-      this.isDragging = false;
+    raf() {
+        this.x += (this.progress - this.x) * 0.1;
+        this.wrap.style.transform = `translateX(${-this.x}px)`;
+        requestAnimationFrame(this.raf.bind(this));
     }
-
-    handleInfiniteScroll() {
-      const originalWidth = this.totalWidth / 3;
-      if (this.scrollX < 0) {
-        this.scrollX += originalWidth;
-        this.smoothScrollX += originalWidth;
-      } else if (this.scrollX > this.totalWidth - originalWidth) {
-        this.scrollX -= originalWidth;
-        this.smoothScrollX -= originalWidth;
-      }
-    }
-
-    animate() {
-      this.smoothScrollX += (this.scrollX - this.smoothScrollX) * 0.05;
-      this.container.style.transform = `translateX(${-this.smoothScrollX}px)`;
-      requestAnimationFrame(() => this.animate());
-    }
-
-    destroy() {
-      this.container.removeEventListener("wheel", this.handleWheelBound);
-      this.container.removeEventListener("touchstart", this.handleTouchStartBound);
-      this.container.removeEventListener("touchmove", this.handleTouchMoveBound);
-      this.container.removeEventListener("touchend", this.handleTouchEndBound);
-      window.removeEventListener("mousemove", this.handleDragMoveBound);
-      window.removeEventListener("mouseup", this.handleDragEndBound);
-    }
-  }
-
-  const galleries = document.querySelectorAll(".gallery-wrapper");
-  galleries.forEach(gallery => {
-    new InfiniteHorizontalScroll(gallery);
-  });
 }
+
+// Initialize all galleries on the page
+const galleries = document.querySelectorAll('.gallery');
+galleries.forEach(gallery => {
+    const slider = new DragScroll({
+        el: gallery,
+        wrap: ".gallery-wrapper",
+        item: ".gallery-item",
+    });
+    slider.calculate();
+});
+
+}
+
 
 
 // ============================================================
@@ -2746,7 +2869,7 @@ function initCustomSmoothScrolling() {
             this.targetScroll = 0;
             this.currentScroll = 0;
             this.scrollEnabled = false;
-            this.isDragging = false;
+            this.isDragging = false; // Always false for mouse drag disabled
             this.startX = 0;
             this.startY = 0;
             this.lastFrameTime = performance.now();
@@ -2811,26 +2934,37 @@ function initCustomSmoothScrolling() {
             window.addEventListener("touchmove", (e) => this.onTouchDrag(e), { passive: false });
             window.addEventListener("touchend", () => this.endTouchDrag());
 
-            // Mouse Dragging
+            // Completely disable mouse dragging by preventing any mouse events from affecting scroll
             window.addEventListener("mousedown", (e) => {
-                // Track right click state
-                if (e.button === 2) {
-                    this.isRightClick = true;
-                    return;
-                }
-                // Only start drag if not right click
-                if (!this.isRightClick) {
-                    this.startMouseDrag(e);
-                }
-            });
-            window.addEventListener("mousemove", (e) => this.onMouseDrag(e));
-            window.addEventListener("mouseup", () => {
-                this.endMouseDrag();
-                // Reset right click state after a short delay
-                setTimeout(() => {
-                    this.isRightClick = false;
-                }, 100);
-            });
+                e.preventDefault();
+                return false;
+            }, { passive: false });
+            
+            window.addEventListener("mousemove", (e) => {
+                // Prevent any mouse movement from affecting scroll
+                return false;
+            }, { passive: false });
+
+            // Mouse Dragging - DISABLED
+            // window.addEventListener("mousedown", (e) => {
+            //     // Track right click state
+            //     if (e.button === 2) {
+            //         this.isRightClick = true;
+            //         return;
+            //     }
+            //     // Only start drag if not right click
+            //     if (!this.isRightClick) {
+            //         this.startMouseDrag(e);
+            //     }
+            // });
+            // window.addEventListener("mousemove", (e) => this.onMouseDrag(e));
+            // window.addEventListener("mouseup", () => {
+            //     this.endMouseDrag();
+            //     // Reset right click state after a short delay
+            //     setTimeout(() => {
+            //         this.isRightClick = false;
+            //     }, 100);
+            // });
 
             // Resize Event
             window.addEventListener("resize", () => {
@@ -2871,6 +3005,7 @@ function initCustomSmoothScrolling() {
 
         startTouchDrag(e) {
             if (!this.scrollEnabled || isSliderDragging) return;
+            // Only allow touch drag, not mouse drag
             this.isDragging = true;
             this.startY = e.touches[0].clientY;
         }
@@ -2896,20 +3031,18 @@ function initCustomSmoothScrolling() {
         }
 
         startMouseDrag(e) {
-            if (!this.scrollEnabled || this.isRightClick) return;
-            this.isDragging = true;
-            this.startY = e.clientY;
+            // Mouse drag disabled - do nothing
+            return;
         }
 
         onMouseDrag(e) {
-            if (!this.isDragging || !this.scrollEnabled || this.isRightClick) return;
-            const delta = (this.startY - e.clientY) * this.dragMultiplier;
-            this.onScroll(delta);
-            this.startY = e.clientY;
+            // Mouse drag disabled - do nothing
+            return;
         }
 
         endMouseDrag() {
-            this.isDragging = false;
+            // Mouse drag disabled - do nothing
+            return;
         }
 
         startSliderDrag(e) {
