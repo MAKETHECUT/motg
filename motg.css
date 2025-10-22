@@ -1795,6 +1795,10 @@ Project Page
   width: 100vw;
 }
 
+.rich-text {
+  grid-gap: 1vw;
+  display: grid;
+}
 
 .gallery {
  /* overflow: hidden;*/
