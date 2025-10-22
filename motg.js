@@ -15,592 +15,54 @@ function initScrollRestoration() {
   document.body.scrollTop = 0;
 }
 
-
 // ============================================================
-// VIMEO LAZY LOADING - MOBILE FIRST APPROACH
-// ============================================================
-
-// Mobile optimization utilities
-function getMobileOptimizations() {
-  const isMobile = window.innerWidth < 768;
-  const isLowEndDevice = navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2;
-  const isSlowConnection = navigator.connection && 
-    (navigator.connection.effectiveType === 'slow-2g' || 
-     navigator.connection.effectiveType === '2g' ||
-     navigator.connection.saveData);
-  
-  return {
-    isMobile,
-    isLowEndDevice,
-    isSlowConnection,
-    quality: isLowEndDevice ? '360p' : (isMobile ? '480p' : '720p'),
-    autoplay: !isMobile || document.hasUserInteracted,
-    preload: isMobile ? 'metadata' : 'auto',
-    // Enhanced mobile detection
-    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
-    isAndroid: /Android/.test(navigator.userAgent),
-    isTouchDevice: 'ontouchstart' in window || navigator.maxTouchPoints > 0
-  };
-}
-
-// Enhanced Vimeo URL optimization for mobile
-function optimizeVimeoUrl(originalUrl, optimizations) {
-  let optimizedUrl = originalUrl;
-  const separator = originalUrl.includes('?') ? '&' : '?';
-  
-  // Add mobile-specific parameters
-  const params = [];
-  
-  if (optimizations.isMobile) {
-    params.push(`quality=${optimizations.quality}`);
-    params.push('autopause=1');
-    params.push('autoplay=0');
-    params.push('muted=1'); // Start muted for better mobile experience
-  }
-  
-  if (optimizations.isSlowConnection) {
-    params.push('quality=360p'); // Force lower quality for slow connections
-    params.push('preload=none'); // Don't preload on slow connections
-  }
-  
-  if (params.length > 0) {
-    optimizedUrl += separator + params.join('&');
-  }
-  
-  return optimizedUrl;
-}
-
-// Legacy function - now handled by VideoManager
-function initVimeoLazyLoad() {
-  // This function is now handled by the VideoManager class
-  // Keeping for backward compatibility but functionality moved to videoManager.init()
-}
-
-
-// ============================================================
-// OPTIMIZED VIDEO MANAGEMENT SYSTEM
+// VIMEO IFRAME RESTORATION
 // ============================================================
 
-class VideoManager {
-  constructor() {
-    this.videoObserver = null;
-    this.vimeoObserver = null;
-    this.initialized = false;
-    this.optimizations = this.getMobileOptimizations();
-    this.videoInstances = new Map();
-    this.vimeoInstances = new Map();
-  }
-
-  getMobileOptimizations() {
-    const isMobile = window.innerWidth < 768;
-    const isLowEndDevice = navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2;
-    const isSlowConnection = navigator.connection && navigator.connection.effectiveType && 
-      ['slow-2g', '2g', '3g'].includes(navigator.connection.effectiveType);
+function initVimeoVideos() {
+  // Simple Vimeo iframe initialization - no complex wrappers
+  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
+  
+  vimeoIframes.forEach(iframe => {
+    // Basic iframe optimization
+    iframe.setAttribute('loading', 'lazy');
+    iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
+    iframe.setAttribute('allowfullscreen', '');
+    iframe.setAttribute('frameborder', '0');
     
-    return { isMobile, isLowEndDevice, isSlowConnection };
-  }
-
-  init() {
-    if (this.initialized) return;
+    // Ensure iframe is visible
+    iframe.style.display = 'block';
+    iframe.style.visibility = 'visible';
+    iframe.style.border = 'none';
     
-    this.initialized = true;
-    this.initVimeoVideos();
-    this.initHTMLVideos();
-    this.setupEventListeners();
-  }
-
-  initVimeoVideos() {
-    const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
-    if (vimeoIframes.length === 0) return;
-
-    // Convert src to data-src for lazy loading and ensure preview images are visible
-    vimeoIframes.forEach(iframe => {
-      const src = iframe.getAttribute('src');
-      if (src) {
-        iframe.setAttribute('data-src', src);
-        iframe.removeAttribute('src');
-        iframe.classList.add('vimeo-lazy');
-        
-        // Ensure preview image is visible
-        this.ensurePreviewImageVisible(iframe);
-      }
-    });
-
-    // Create optimized intersection observer with much earlier preloading
-    this.vimeoObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => this.handleVimeoIntersection(entry));
-    }, {
-      rootMargin: this.optimizations.isMobile ? '800px 0px' : '1200px 0px', // Much earlier preloading for smoother experience
-      threshold: this.optimizations.isMobile ? 0.01 : 0.001 // Very low threshold for earliest detection
-    });
-
-    vimeoIframes.forEach(iframe => this.vimeoObserver.observe(iframe));
-  }
-
-  handleVimeoIntersection(entry) {
-    const iframe = entry.target;
-    
-    if (entry.isIntersecting) {
-      this.loadVimeoVideo(iframe);
-    } else {
-      this.unloadVimeoVideo(iframe);
-    }
-  }
-
-  loadVimeoVideo(iframe) {
-    const dataSrc = iframe.getAttribute('data-src');
-    if (!dataSrc) return;
-
-    const optimizedSrc = this.optimizeVimeoUrl(dataSrc);
-    iframe.setAttribute('src', optimizedSrc);
-    iframe.removeAttribute('data-src');
-    iframe.classList.remove('vimeo-lazy');
-    iframe.classList.add('vimeo-loaded');
-
-    // Hide preview image when video loads
-    this.hidePreviewImage(iframe);
-
-    // Initialize Vimeo Player API
-    if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
-      const player = new Vimeo.Player(iframe);
-      this.vimeoInstances.set(iframe, player);
-      
-      if (this.optimizations.isMobile) {
-        player.setVolume(0.5);
-      }
-    }
-  }
-
-  unloadVimeoVideo(iframe) {
-    if (!iframe.classList.contains('vimeo-loaded')) return;
-
-    const player = this.vimeoInstances.get(iframe);
-    if (player) {
-      player.pause().catch(() => {});
-      
-      // Unload on mobile/low-end devices to save memory
-      if (this.optimizations.isMobile || this.optimizations.isLowEndDevice) {
-        const currentSrc = iframe.getAttribute('src');
-        if (currentSrc) {
-          iframe.setAttribute('data-src', currentSrc);
-          iframe.removeAttribute('src');
-          iframe.classList.add('vimeo-lazy');
-          iframe.classList.remove('vimeo-loaded');
-          
-          // Show preview image again when video is unloaded
-          this.ensurePreviewImageVisible(iframe);
-        }
-        
-        player.destroy().catch(() => {});
-        this.vimeoInstances.delete(iframe);
-      }
-    }
-  }
-
-  ensurePreviewImageVisible(iframe) {
-    // Find the associated preview image
-    const container = iframe.closest('.image-wrapper, .video-wrapper, .video-container');
-    if (!container) return;
-
-    // Look for existing preview image
-    let previewImg = container.querySelector('.work-img, .video-preview');
-    
-    if (!previewImg) {
-      // Create a preview image if none exists
-      previewImg = document.createElement('img');
-      previewImg.className = 'video-preview';
-      previewImg.alt = 'Video preview';
-      previewImg.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: 1;
-        opacity: 1;
-        transition: opacity 0.3s ease;
-      `;
-      
-      // Try to get a preview image from the Vimeo URL
-      const dataSrc = iframe.getAttribute('data-src') || iframe.getAttribute('src');
-      if (dataSrc) {
-        const videoId = this.extractVimeoId(dataSrc);
-        if (videoId) {
-          previewImg.src = `https://vumbnail.com/${videoId}.jpg`;
-        }
-      }
-      
-      container.appendChild(previewImg);
-    }
-    
-    // Ensure preview image is visible
-    previewImg.style.opacity = '1';
-    previewImg.style.display = 'block';
-  }
-
-  hidePreviewImage(iframe) {
-    const container = iframe.closest('.image-wrapper, .video-wrapper, .video-container');
-    if (!container) return;
-
-    const previewImg = container.querySelector('.work-img, .video-preview');
-    if (previewImg) {
-      previewImg.style.opacity = '0';
-      setTimeout(() => {
-        previewImg.style.display = 'none';
-      }, 300);
-    }
-  }
-
-  extractVimeoId(url) {
-    const match = url.match(/vimeo\.com\/(\d+)/);
-    return match ? match[1] : null;
-  }
-
-  ensureHTMLVideoPreview(video) {
-    const container = video.closest('.video-wrapper, .video-container');
-    if (!container) return;
-
-    // Look for existing preview image
-    let previewImg = container.querySelector('.work-img, .video-preview');
-    
-    if (!previewImg) {
-      // Create a preview image if none exists
-      previewImg = document.createElement('img');
-      previewImg.className = 'video-preview';
-      previewImg.alt = 'Video preview';
-      previewImg.style.cssText = `
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        z-index: 1;
-        opacity: 1;
-        transition: opacity 0.3s ease;
-        pointer-events: none;
-      `;
-      
-      // Try to get a preview image from the video source
-      const source = video.querySelector('source');
-      if (source && source.src) {
-        // For Vimeo videos, try to extract the ID and get thumbnail
-        const videoId = this.extractVimeoId(source.src);
-        if (videoId) {
-          previewImg.src = `https://vumbnail.com/${videoId}.jpg`;
-        }
-      }
-      
-      container.appendChild(previewImg);
-    }
-    
-    // Ensure preview image is visible
-    previewImg.style.opacity = '1';
-    previewImg.style.display = 'block';
-  }
-
-  hideHTMLVideoPreview(video) {
-    const container = video.closest('.video-wrapper, .video-container');
-    if (!container) return;
-
-    const previewImg = container.querySelector('.work-img, .video-preview');
-    if (previewImg) {
-      previewImg.style.opacity = '0';
-      setTimeout(() => {
-        previewImg.style.display = 'none';
-      }, 300);
-    }
-  }
-
-  optimizeVimeoUrl(url) {
-    if (!url) return '';
-    
-    let optimizedUrl = url;
-    
-    // Add mobile optimizations
-    if (this.optimizations.isMobile) {
-      const separator = optimizedUrl.includes('?') ? '&' : '?';
-      optimizedUrl += `${separator}quality=480p&responsive=1`;
-    }
-    
-    if (this.optimizations.isSlowConnection) {
-      const separator = optimizedUrl.includes('?') ? '&' : '?';
-      optimizedUrl += `${separator}quality=360p`;
-    }
-    
-    return optimizedUrl;
-  }
-
-  initHTMLVideos() {
-    const videos = document.querySelectorAll('video');
-    if (videos.length === 0) return;
-
-    // Process video sources
-    this.processVideoSources();
-    
-    // Configure videos
-    videos.forEach(video => this.configureVideo(video));
-    
-    // Create intersection observer with much earlier preloading for smoother entrance
-    this.videoObserver = new IntersectionObserver((entries) => {
-      entries.forEach(entry => this.handleVideoIntersection(entry));
-    }, {
-      threshold: 0.1, // Lower threshold for earlier detection
-      rootMargin: this.optimizations.isMobile ? '600px 0px' : '800px 0px' // Much earlier preloading for smoother experience
-    });
-
-    videos.forEach(video => this.videoObserver.observe(video));
-  }
-
-  processVideoSources() {
-    document.querySelectorAll("video source.video-src").forEach(source => {
-      if (source.src && source.src.includes('dropbox.com')) {
-        source.src = this.convertDropboxLink(source.src);
-      }
-    });
-  }
-
-  convertDropboxLink(url) {
-    if (!url) return '';
-    
-    let convertedUrl = url
-      .replace("www.dropbox.com", "dl.dropboxusercontent.com")
-      .replace(/(\?dl=0|&dl=0)/g, "");
-
-    if (this.optimizations.isMobile) {
-      const separator = convertedUrl.includes('?') ? '&' : '?';
-      convertedUrl += `${separator}raw=1&size=480p`;
-    }
-
-    return convertedUrl;
-  }
-
-  configureVideo(video) {
-    video.setAttribute('preload', 'metadata');
-    video.setAttribute('x-webkit-airplay', 'allow');
-    
-    // Ensure preview image is visible for HTML videos
-    this.ensureHTMLVideoPreview(video);
-    
-    if (this.optimizations.isMobile) {
-      video.setAttribute('playsinline', '');
-      video.setAttribute('muted', '');
-      video.setAttribute('autoplay', '');
-      video.setAttribute('loading', 'lazy');
-      
-      // Optimize sources for mobile
-      const sources = video.querySelectorAll('source');
-      sources.forEach(source => {
-        if (source.getAttribute('data-mobile-src')) {
-          source.src = source.getAttribute('data-mobile-src');
-        } else {
-          const currentSrc = source.src;
-          if (currentSrc.includes('_1080p') || currentSrc.includes('_720p')) {
-            source.src = currentSrc.replace(/_1080p|_720p/g, '_480p');
-          }
-        }
-      });
-      
-      video.style.maxWidth = '100%';
-      video.style.height = 'auto';
-    }
-
-    this.videoInstances.set(video, {
-      isPlaying: false,
-      hasLoaded: false
-    });
-  }
-
-  handleVideoIntersection(entry) {
-    const video = entry.target;
-    const videoData = this.videoInstances.get(video);
-    
-    if (entry.isIntersecting) {
-      this.playVideo(video, videoData);
-    } else {
-      this.pauseVideo(video, videoData);
-    }
-  }
-
-  playVideo(video, videoData) {
-    if (video.paused && videoData) {
-      if (this.optimizations.isMobile) {
-        video.muted = true;
-      }
-      
-      // Hide preview image when video starts playing
-      this.hideHTMLVideoPreview(video);
-      
-      const playPromise = video.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(error => {
-          const container = video.closest('.video-container, #video-container');
-          if (container) {
-            container.classList.add('show-play-button');
-          }
-        });
-      }
-      
-      videoData.isPlaying = true;
-    }
-  }
-
-  pauseVideo(video, videoData) {
-    if (!video.paused && videoData) {
-      video.pause();
-      videoData.isPlaying = false;
-      
-      if (this.optimizations.isMobile) {
-        video.currentTime = 0;
-      }
-    }
-  }
-
-  setupEventListeners() {
-    // Track user interaction for mobile autoplay
-    if (this.optimizations.isMobile) {
-      const trackUserInteraction = () => {
-        document.hasUserInteracted = true;
-        document.removeEventListener('touchstart', trackUserInteraction);
-        document.removeEventListener('click', trackUserInteraction);
-      };
-      
-      document.addEventListener('touchstart', trackUserInteraction, { once: true });
-      document.addEventListener('click', trackUserInteraction, { once: true });
-    }
-
-    // Scroll listener removed for now to fix video display issues
-
-    // Memory management
-    if (this.optimizations.isMobile || this.optimizations.isLowEndDevice) {
-      this.setupMemoryManagement();
-    }
-
-    // Page visibility management
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        this.pauseAllVideos();
-      }
-    });
-  }
-
-
-  setupMemoryManagement() {
-    const memoryMonitor = () => {
-      if (performance.memory) {
-        const usedMemory = performance.memory.usedJSHeapSize;
-        const totalMemory = performance.memory.totalJSHeapSize;
-        const memoryUsage = usedMemory / totalMemory;
-        
-        if (memoryUsage > 0.8) {
-          this.cleanupOffScreenVideos();
-        }
-      }
-    };
-    
-    setInterval(memoryMonitor, 30000);
-  }
-
-  cleanupOffScreenVideos() {
-    // Cleanup Vimeo videos
-    this.vimeoInstances.forEach((player, iframe) => {
-      const rect = iframe.getBoundingClientRect();
-      const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
-      
-      if (!isInViewport) {
-        this.unloadVimeoVideo(iframe);
-      }
-    });
-
-    // Cleanup HTML videos
-    this.videoInstances.forEach((videoData, video) => {
-      const rect = video.getBoundingClientRect();
-      const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
-      
-      if (!isInViewport && !video.paused) {
-        video.pause();
-        videoData.isPlaying = false;
-      }
-    });
-  }
-
-  pauseAllVideos() {
-    // Pause all Vimeo videos
-    this.vimeoInstances.forEach((player) => {
-      player.pause().catch(() => {});
-    });
-
-    // Pause all HTML videos
-    this.videoInstances.forEach((videoData, video) => {
-      if (!video.paused) {
-        video.pause();
-        videoData.isPlaying = false;
-      }
-    });
-  }
-
-  destroy() {
-    if (this.videoObserver) {
-      this.videoObserver.disconnect();
-    }
-    if (this.vimeoObserver) {
-      this.vimeoObserver.disconnect();
-    }
-    
-    this.vimeoInstances.forEach((player) => {
-      player.destroy().catch(() => {});
+    // Add basic error handling
+    iframe.addEventListener('error', () => {
+      console.log('Vimeo iframe failed to load:', iframe.src);
     });
     
-    this.videoInstances.clear();
-    this.vimeoInstances.clear();
-    this.initialized = false;
-  }
-}
-
-// Global video manager instance
-const videoManager = new VideoManager();
-
-// Initialize videos
-function initVideos() {
-  videoManager.init();
-}
-
-
-// ============================================================
-// OPTIMIZED VIDEO EVENT LISTENERS
-// ============================================================
-
-function setupVideoEventListeners() {
-  // Initialize videos when DOM is ready
-  document.addEventListener('DOMContentLoaded', () => {
-    initVideos();
-  });
-
-  // Re-initialize videos after page transitions
-  window.addEventListener('load', () => {
-    initVideos();
+    iframe.addEventListener('load', () => {
+      console.log('Vimeo iframe loaded successfully:', iframe.src);
+    });
   });
 }
 
-// ============================================================
-// VIDEO CLEANUP FOR PAGE TRANSITIONS
-// ============================================================
-
-function cleanupVideosForTransition() {
-  if (videoManager) {
-    videoManager.pauseAllVideos();
-  }
+function extractVimeoId(url) {
+  const match = url.match(/vimeo\.com\/video\/(\d+)/);
+  return match ? match[1] : null;
 }
 
-function reinitializeVideosAfterTransition() {
-  if (videoManager) {
-    videoManager.destroy();
-    // Recreate the video manager
-    window.videoManager = new VideoManager();
-    initVideos();
-  }
+// Simple debug function
+function debugVimeoIframes() {
+  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
+  console.log(`Found ${vimeoIframes.length} Vimeo iframes`);
 }
+
+// Call debug function after a short delay
+setTimeout(debugVimeoIframes, 2000);
+
+
+
+
 
 
 // ============================================================
@@ -3551,8 +3013,8 @@ function initializeApplication() {
     initScrollRestoration();
     setupMegaMenuEventListeners();
     initCustomSmoothScrolling();
-    // Initialize optimized video manager
-    initVideos();
+    // Initialize Vimeo videos
+    initVimeoVideos();
   setTimeout(() => {
     initSplitTextAnimations();
   }, 800);
