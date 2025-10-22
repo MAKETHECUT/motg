@@ -1787,7 +1787,7 @@ Project Page
 }
 
 .text-section {
-  padding: 5vw 0;
+  padding: 5vw 0!important;
 }
 
 .gallery-section {
@@ -1879,6 +1879,10 @@ Project Page
     align-items: start;
     justify-content: start;
     width:100%;
+  }
+
+  .text-section {
+    padding: 18vw 0!important;
   }
   
   .case-info .indicator {
