@@ -411,15 +411,55 @@ function initInfinityGallery() {
     }
 }
 
-// Initialize all galleries on the page
+// Initialize galleries with individual triggers
 const galleries = document.querySelectorAll('.gallery');
-galleries.forEach(gallery => {
-    const slider = new DragScroll({
-        el: gallery,
-        wrap: ".gallery-wrapper",
-        item: ".gallery-item",
-    });
-    slider.calculate();
+galleries.forEach((gallery, index) => {
+    // Check if gallery is already visible on page load
+    const rect = gallery.getBoundingClientRect();
+    const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+    
+    if (isVisible) {
+        // Initialize immediately if gallery is already visible
+        const slider = new DragScroll({
+            el: gallery,
+            wrap: ".gallery-wrapper",
+            item: ".gallery-item",
+        });
+        slider.calculate();
+        gallery.setAttribute('data-gallery-initialized', 'true');
+    } else {
+        // Create individual trigger for each gallery
+        const trigger = ScrollTrigger.create({
+            trigger: gallery,
+            start: "top 80%", // Trigger when gallery is 80% from top of viewport
+            onEnter: () => {
+                // Only initialize if not already initialized
+                if (!gallery.hasAttribute('data-gallery-initialized')) {
+                    const slider = new DragScroll({
+                        el: gallery,
+                        wrap: ".gallery-wrapper",
+                        item: ".gallery-item",
+                    });
+                    slider.calculate();
+                    gallery.setAttribute('data-gallery-initialized', 'true');
+                }
+            },
+            onLeave: () => {
+                // Optional: cleanup when leaving gallery
+            },
+            onEnterBack: () => {
+                // Re-initialize when scrolling back up
+                if (gallery.hasAttribute('data-gallery-initialized')) {
+                    const slider = new DragScroll({
+                        el: gallery,
+                        wrap: ".gallery-wrapper",
+                        item: ".gallery-item",
+                    });
+                    slider.calculate();
+                }
+            }
+        });
+    }
 });
 
 }
@@ -3001,11 +3041,47 @@ if (!hasScrolledDown || st < threshold) return;
 
 
 // ============================================================
+// SCROLL DELAY - PREVENT SCROLLING FOR 2 SECONDS
+// ============================================================
+
+function initScrollDelay() {
+    let scrollDisabled = true;
+    
+    // Prevent all scroll events for 2 seconds
+    const preventScroll = (e) => {
+        if (scrollDisabled) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    };
+    
+    // Add scroll prevention to multiple event types
+    window.addEventListener('wheel', preventScroll, { passive: false });
+    window.addEventListener('touchmove', preventScroll, { passive: false });
+    window.addEventListener('keydown', (e) => {
+        if (scrollDisabled && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'PageDown' || e.key === 'PageUp' || e.key === 'Home' || e.key === 'End' || e.key === ' ')) {
+            e.preventDefault();
+        }
+    });
+    
+    // Enable scrolling after 2 seconds
+    setTimeout(() => {
+        scrollDisabled = false;
+        window.removeEventListener('wheel', preventScroll);
+        window.removeEventListener('touchmove', preventScroll);
+    }, 2000);
+}
+
+// ============================================================
 // MASTER INITIALIZATION - SINGLE ENTRY POINT
 // ============================================================
 
 
 function initializeApplication() {
+    // Disable scroll for 2 seconds to allow galleries and videos to load
+    initScrollDelay();
+    
     initSliderMarquee();
     initLogosLoop();
     initGsapAnimations();
