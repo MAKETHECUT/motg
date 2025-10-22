@@ -35,7 +35,11 @@ function getMobileOptimizations() {
     isSlowConnection,
     quality: isLowEndDevice ? '360p' : (isMobile ? '480p' : '720p'),
     autoplay: !isMobile || document.hasUserInteracted,
-    preload: isMobile ? 'metadata' : 'auto'
+    preload: isMobile ? 'metadata' : 'auto',
+    // Enhanced mobile detection
+    isIOS: /iPad|iPhone|iPod/.test(navigator.userAgent),
+    isAndroid: /Android/.test(navigator.userAgent),
+    isTouchDevice: 'ontouchstart' in window || navigator.maxTouchPoints > 0
   };
 }
 
@@ -66,198 +70,305 @@ function optimizeVimeoUrl(originalUrl, optimizations) {
   return optimizedUrl;
 }
 
+// Legacy function - now handled by VideoManager
 function initVimeoLazyLoad() {
-  // Find all Vimeo iframes except the hero video (showreel-video)
-  const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
-  
-  if (vimeoIframes.length === 0) return;
-  
-  // Get mobile optimizations
-  const optimizations = getMobileOptimizations();
-  
-  // Convert src to data-src for lazy loading with mobile optimizations
-  vimeoIframes.forEach(iframe => {
-    const src = iframe.getAttribute('src');
-    if (src) {
-      // Store original src in data-src
-      iframe.setAttribute('data-src', src);
-      // Remove src to prevent immediate loading
-      iframe.removeAttribute('src');
-      // Add loading indicator class
-      iframe.classList.add('vimeo-lazy');
-      
-      // Add mobile-specific optimizations
-      if (optimizations.isMobile) {
-        iframe.classList.add('vimeo-mobile');
-      }
-      if (optimizations.isLowEndDevice) {
-        iframe.classList.add('vimeo-low-end');
-      }
-      if (optimizations.isSlowConnection) {
-        iframe.classList.add('vimeo-slow-connection');
-      }
-    }
-  });
-  
-  // Mobile-first intersection observer settings
-  const observerOptions = {
-    rootMargin: optimizations.isMobile ? '500px 0px' : '1000px 0px', // Smaller margin on mobile
-    threshold: optimizations.isMobile ? 0.1 : 0.01 // Higher threshold on mobile for better performance
-  };
-  
-  // Create Intersection Observer for lazy loading and playback control
-  const vimeoObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      const iframe = entry.target;
-      
-      if (entry.isIntersecting) {
-        // Video is entering viewport
-        const dataSrc = iframe.getAttribute('data-src');
-        
-        if (dataSrc) {
-          // Load the iframe for first time with mobile optimizations
-          const optimizedSrc = optimizeVimeoUrl(dataSrc, optimizations);
-          
-          iframe.setAttribute('src', optimizedSrc);
-          // Remove data-src attribute
-          iframe.removeAttribute('data-src');
-          // Remove lazy loading class
-          iframe.classList.remove('vimeo-lazy');
-          // Add loaded class for styling
-          iframe.classList.add('vimeo-loaded');
-          
-          // Initialize Vimeo Player API for this iframe with mobile optimizations
-          if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
-            iframe.vimeoPlayer = new Vimeo.Player(iframe);
-            
-            // Set mobile-specific player options
-            if (optimizations.isMobile) {
-              iframe.vimeoPlayer.setVolume(0.5); // Lower default volume on mobile
-            }
-          }
-        } else if (iframe.classList.contains('vimeo-loaded')) {
-          // Video was already loaded, just play it (with mobile considerations)
-          if (iframe.vimeoPlayer) {
-            // On mobile, only autoplay if user has interacted with the page
-            if (!optimizations.isMobile || document.hasUserInteracted) {
-              iframe.vimeoPlayer.play().catch(() => {});
-            }
-          }
-        }
-      } else {
-        // Video is leaving viewport - pause and cleanup to save memory
-        if (iframe.classList.contains('vimeo-loaded') && iframe.vimeoPlayer) {
-          iframe.vimeoPlayer.pause().catch(() => {});
-          
-          // On mobile and low-end devices, unload the iframe to save memory
-          if (optimizations.isMobile || optimizations.isLowEndDevice) {
-            // Store the src before removing
-            const currentSrc = iframe.getAttribute('src');
-            if (currentSrc) {
-              iframe.setAttribute('data-src', currentSrc);
-              iframe.removeAttribute('src');
-              iframe.classList.add('vimeo-lazy');
-              iframe.classList.remove('vimeo-loaded');
-              
-              // Clean up the player instance
-              if (iframe.vimeoPlayer) {
-                iframe.vimeoPlayer.destroy().catch(() => {});
-                iframe.vimeoPlayer = null;
-              }
-            }
-          }
-        }
-      }
-    });
-  }, observerOptions);
-  
-  // Observe all Vimeo iframes
-  vimeoIframes.forEach(iframe => {
-    vimeoObserver.observe(iframe);
-  });
-  
-  // Track user interaction for mobile autoplay
-  if (optimizations.isMobile) {
-    const trackUserInteraction = () => {
-      document.hasUserInteracted = true;
-      document.removeEventListener('touchstart', trackUserInteraction);
-      document.removeEventListener('click', trackUserInteraction);
-    };
-    
-    document.addEventListener('touchstart', trackUserInteraction, { once: true });
-    document.addEventListener('click', trackUserInteraction, { once: true });
-  }
-  
-  // Memory management for mobile devices
-  if (optimizations.isMobile || optimizations.isLowEndDevice) {
-    // Monitor memory usage and cleanup if needed
-    const memoryMonitor = () => {
-      if (performance.memory) {
-        const usedMemory = performance.memory.usedJSHeapSize;
-        const totalMemory = performance.memory.totalJSHeapSize;
-        const memoryUsage = usedMemory / totalMemory;
-        
-        // If memory usage is high, force cleanup of all off-screen videos
-        if (memoryUsage > 0.8) {
-          vimeoIframes.forEach(iframe => {
-            if (!iframe.classList.contains('vimeo-loaded')) return;
-            
-            const rect = iframe.getBoundingClientRect();
-            const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
-            
-            if (!isInViewport && iframe.vimeoPlayer) {
-              iframe.vimeoPlayer.pause().catch(() => {});
-              iframe.vimeoPlayer.destroy().catch(() => {});
-              iframe.vimeoPlayer = null;
-              
-              // Unload the iframe
-              const currentSrc = iframe.getAttribute('src');
-              if (currentSrc) {
-                iframe.setAttribute('data-src', currentSrc);
-                iframe.removeAttribute('src');
-                iframe.classList.add('vimeo-lazy');
-                iframe.classList.remove('vimeo-loaded');
-              }
-            }
-          });
-        }
-      }
-    };
-    
-    // Check memory usage every 30 seconds on mobile
-    setInterval(memoryMonitor, 30000);
-    
-    // Also check on page visibility change
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) {
-        // Page is hidden, pause all videos to save battery
-        vimeoIframes.forEach(iframe => {
-          if (iframe.vimeoPlayer && iframe.classList.contains('vimeo-loaded')) {
-            iframe.vimeoPlayer.pause().catch(() => {});
-          }
-        });
-      }
-    });
-  }
+  // This function is now handled by the VideoManager class
+  // Keeping for backward compatibility but functionality moved to videoManager.init()
 }
 
 
 // ============================================================
-// VIDEO INITIALIZATION
+// OPTIMIZED VIDEO MANAGEMENT SYSTEM
 // ============================================================
 
-function initVideos() {
-  function convertDropboxLink(url) {
+class VideoManager {
+  constructor() {
+    this.videoObserver = null;
+    this.vimeoObserver = null;
+    this.initialized = false;
+    this.optimizations = this.getMobileOptimizations();
+    this.videoInstances = new Map();
+    this.vimeoInstances = new Map();
+  }
+
+  getMobileOptimizations() {
+    const isMobile = window.innerWidth < 768;
+    const isLowEndDevice = navigator.hardwareConcurrency <= 2 || navigator.deviceMemory <= 2;
+    const isSlowConnection = navigator.connection && navigator.connection.effectiveType && 
+      ['slow-2g', '2g', '3g'].includes(navigator.connection.effectiveType);
+    
+    return { isMobile, isLowEndDevice, isSlowConnection };
+  }
+
+  init() {
+    if (this.initialized) return;
+    
+    this.initialized = true;
+    this.initVimeoVideos();
+    this.initHTMLVideos();
+    this.setupEventListeners();
+  }
+
+  initVimeoVideos() {
+    const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
+    if (vimeoIframes.length === 0) return;
+
+    // Convert src to data-src for lazy loading and ensure preview images are visible
+    vimeoIframes.forEach(iframe => {
+      const src = iframe.getAttribute('src');
+      if (src) {
+        iframe.setAttribute('data-src', src);
+        iframe.removeAttribute('src');
+        iframe.classList.add('vimeo-lazy');
+        
+        // Ensure preview image is visible
+        this.ensurePreviewImageVisible(iframe);
+      }
+    });
+
+    // Create optimized intersection observer with much earlier preloading
+    this.vimeoObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => this.handleVimeoIntersection(entry));
+    }, {
+      rootMargin: this.optimizations.isMobile ? '800px 0px' : '1200px 0px', // Much earlier preloading for smoother experience
+      threshold: this.optimizations.isMobile ? 0.01 : 0.001 // Very low threshold for earliest detection
+    });
+
+    vimeoIframes.forEach(iframe => this.vimeoObserver.observe(iframe));
+  }
+
+  handleVimeoIntersection(entry) {
+    const iframe = entry.target;
+    
+    if (entry.isIntersecting) {
+      this.loadVimeoVideo(iframe);
+    } else {
+      this.unloadVimeoVideo(iframe);
+    }
+  }
+
+  loadVimeoVideo(iframe) {
+    const dataSrc = iframe.getAttribute('data-src');
+    if (!dataSrc) return;
+
+    const optimizedSrc = this.optimizeVimeoUrl(dataSrc);
+    iframe.setAttribute('src', optimizedSrc);
+    iframe.removeAttribute('data-src');
+    iframe.classList.remove('vimeo-lazy');
+    iframe.classList.add('vimeo-loaded');
+
+    // Hide preview image when video loads
+    this.hidePreviewImage(iframe);
+
+    // Initialize Vimeo Player API
+    if (typeof Vimeo !== 'undefined' && Vimeo.Player) {
+      const player = new Vimeo.Player(iframe);
+      this.vimeoInstances.set(iframe, player);
+      
+      if (this.optimizations.isMobile) {
+        player.setVolume(0.5);
+      }
+    }
+  }
+
+  unloadVimeoVideo(iframe) {
+    if (!iframe.classList.contains('vimeo-loaded')) return;
+
+    const player = this.vimeoInstances.get(iframe);
+    if (player) {
+      player.pause().catch(() => {});
+      
+      // Unload on mobile/low-end devices to save memory
+      if (this.optimizations.isMobile || this.optimizations.isLowEndDevice) {
+        const currentSrc = iframe.getAttribute('src');
+        if (currentSrc) {
+          iframe.setAttribute('data-src', currentSrc);
+          iframe.removeAttribute('src');
+          iframe.classList.add('vimeo-lazy');
+          iframe.classList.remove('vimeo-loaded');
+          
+          // Show preview image again when video is unloaded
+          this.ensurePreviewImageVisible(iframe);
+        }
+        
+        player.destroy().catch(() => {});
+        this.vimeoInstances.delete(iframe);
+      }
+    }
+  }
+
+  ensurePreviewImageVisible(iframe) {
+    // Find the associated preview image
+    const container = iframe.closest('.image-wrapper, .video-wrapper, .video-container');
+    if (!container) return;
+
+    // Look for existing preview image
+    let previewImg = container.querySelector('.work-img, .video-preview');
+    
+    if (!previewImg) {
+      // Create a preview image if none exists
+      previewImg = document.createElement('img');
+      previewImg.className = 'video-preview';
+      previewImg.alt = 'Video preview';
+      previewImg.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+      `;
+      
+      // Try to get a preview image from the Vimeo URL
+      const dataSrc = iframe.getAttribute('data-src') || iframe.getAttribute('src');
+      if (dataSrc) {
+        const videoId = this.extractVimeoId(dataSrc);
+        if (videoId) {
+          previewImg.src = `https://vumbnail.com/${videoId}.jpg`;
+        }
+      }
+      
+      container.appendChild(previewImg);
+    }
+    
+    // Ensure preview image is visible
+    previewImg.style.opacity = '1';
+    previewImg.style.display = 'block';
+  }
+
+  hidePreviewImage(iframe) {
+    const container = iframe.closest('.image-wrapper, .video-wrapper, .video-container');
+    if (!container) return;
+
+    const previewImg = container.querySelector('.work-img, .video-preview');
+    if (previewImg) {
+      previewImg.style.opacity = '0';
+      setTimeout(() => {
+        previewImg.style.display = 'none';
+      }, 300);
+    }
+  }
+
+  extractVimeoId(url) {
+    const match = url.match(/vimeo\.com\/(\d+)/);
+    return match ? match[1] : null;
+  }
+
+  ensureHTMLVideoPreview(video) {
+    const container = video.closest('.video-wrapper, .video-container');
+    if (!container) return;
+
+    // Look for existing preview image
+    let previewImg = container.querySelector('.work-img, .video-preview');
+    
+    if (!previewImg) {
+      // Create a preview image if none exists
+      previewImg = document.createElement('img');
+      previewImg.className = 'video-preview';
+      previewImg.alt = 'Video preview';
+      previewImg.style.cssText = `
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        z-index: 1;
+        opacity: 1;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+      `;
+      
+      // Try to get a preview image from the video source
+      const source = video.querySelector('source');
+      if (source && source.src) {
+        // For Vimeo videos, try to extract the ID and get thumbnail
+        const videoId = this.extractVimeoId(source.src);
+        if (videoId) {
+          previewImg.src = `https://vumbnail.com/${videoId}.jpg`;
+        }
+      }
+      
+      container.appendChild(previewImg);
+    }
+    
+    // Ensure preview image is visible
+    previewImg.style.opacity = '1';
+    previewImg.style.display = 'block';
+  }
+
+  hideHTMLVideoPreview(video) {
+    const container = video.closest('.video-wrapper, .video-container');
+    if (!container) return;
+
+    const previewImg = container.querySelector('.work-img, .video-preview');
+    if (previewImg) {
+      previewImg.style.opacity = '0';
+      setTimeout(() => {
+        previewImg.style.display = 'none';
+      }, 300);
+    }
+  }
+
+  optimizeVimeoUrl(url) {
     if (!url) return '';
     
-    // Base conversion for Dropbox links
+    let optimizedUrl = url;
+    
+    // Add mobile optimizations
+    if (this.optimizations.isMobile) {
+      const separator = optimizedUrl.includes('?') ? '&' : '?';
+      optimizedUrl += `${separator}quality=480p&responsive=1`;
+    }
+    
+    if (this.optimizations.isSlowConnection) {
+      const separator = optimizedUrl.includes('?') ? '&' : '?';
+      optimizedUrl += `${separator}quality=360p`;
+    }
+    
+    return optimizedUrl;
+  }
+
+  initHTMLVideos() {
+    const videos = document.querySelectorAll('video');
+    if (videos.length === 0) return;
+
+    // Process video sources
+    this.processVideoSources();
+    
+    // Configure videos
+    videos.forEach(video => this.configureVideo(video));
+    
+    // Create intersection observer with much earlier preloading for smoother entrance
+    this.videoObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => this.handleVideoIntersection(entry));
+    }, {
+      threshold: 0.1, // Lower threshold for earlier detection
+      rootMargin: this.optimizations.isMobile ? '600px 0px' : '800px 0px' // Much earlier preloading for smoother experience
+    });
+
+    videos.forEach(video => this.videoObserver.observe(video));
+  }
+
+  processVideoSources() {
+    document.querySelectorAll("video source.video-src").forEach(source => {
+      if (source.src && source.src.includes('dropbox.com')) {
+        source.src = this.convertDropboxLink(source.src);
+      }
+    });
+  }
+
+  convertDropboxLink(url) {
+    if (!url) return '';
+    
     let convertedUrl = url
       .replace("www.dropbox.com", "dl.dropboxusercontent.com")
       .replace(/(\?dl=0|&dl=0)/g, "");
 
-    // Add mobile compression parameters for Dropbox videos
-    if (window.innerWidth < 650) {
-      // Add compression parameters to the URL
+    if (this.optimizations.isMobile) {
       const separator = convertedUrl.includes('?') ? '&' : '?';
       convertedUrl += `${separator}raw=1&size=480p`;
     }
@@ -265,143 +376,205 @@ function initVideos() {
     return convertedUrl;
   }
 
-  // Process all video sources first
-  document.querySelectorAll("video source.video-src").forEach(source => {
-    if (source.src && source.src.includes('dropbox.com')) {
-      source.src = convertDropboxLink(source.src);
-    }
-  });
-
-  // Process all videos
-  const videos = document.querySelectorAll('video');
-
-  videos.forEach(video => {
-    // Set video attributes for better playback
-    video.setAttribute('preload', 'auto');
+  configureVideo(video) {
+    video.setAttribute('preload', 'metadata');
     video.setAttribute('x-webkit-airplay', 'allow');
     
-    // Enhanced mobile optimization
-    if (window.innerWidth < 650) {
-      // Mobile-specific attributes
+    // Ensure preview image is visible for HTML videos
+    this.ensureHTMLVideoPreview(video);
+    
+    if (this.optimizations.isMobile) {
       video.setAttribute('playsinline', '');
       video.setAttribute('muted', '');
       video.setAttribute('autoplay', '');
+      video.setAttribute('loading', 'lazy');
       
-      // Set lower quality for mobile
+      // Optimize sources for mobile
       const sources = video.querySelectorAll('source');
       sources.forEach(source => {
-        // If there's a mobile-specific source, use it
         if (source.getAttribute('data-mobile-src')) {
           source.src = source.getAttribute('data-mobile-src');
         } else {
-          // Otherwise, try to use a lower quality version if available
           const currentSrc = source.src;
           if (currentSrc.includes('_1080p') || currentSrc.includes('_720p')) {
             source.src = currentSrc.replace(/_1080p|_720p/g, '_480p');
           }
         }
       });
-
-      // Set lower resolution for mobile
+      
       video.style.maxWidth = '100%';
       video.style.height = 'auto';
-      
-      // Enable lazy loading for mobile
-      video.setAttribute('loading', 'lazy');
-      
-      // Reduce video quality for mobile
-      if (video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"')) {
-        video.setAttribute('data-quality', 'low');
-      }
     }
 
-    // Load the video
-    video.load();
-  });
-
-  // Create Intersection Observer for viewport-based playback with mobile optimization
-  const videoObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      const video = entry.target;
-      
-      if (entry.isIntersecting) {
-        // Video is in viewport
-        if (video.paused) {
-          // Mobile-specific playback handling
-          if (window.innerWidth < 650) {
-            // Ensure video is muted on mobile
-            video.muted = true;
-            // Use lower quality on mobile
-            if (video.getAttribute('data-quality') === 'low') {
-              video.playbackRate = 1.0; // Normal speed for mobile
-            }
-          }
-          
-          const playPromise = video.play();
-          if (playPromise !== undefined) {
-            playPromise.catch(error => {
-              console.log('Playback failed:', error);
-              // If autoplay fails, show play button
-              const container = video.closest('.video-container, #video-container');
-              if (container) {
-                container.classList.add('show-play-button');
-              }
-            });
-          }
-        }
-      } else {
-        // Video is out of viewport
-        if (!video.paused) {
-          video.pause();
-          // Reset video to start when out of view on mobile
-          if (window.innerWidth < 650) {
-            video.currentTime = 0;
-          }
-        }
-      }
-    });
-  }, {
-    threshold: 0.5,
-    rootMargin: '50px 0px'
-  });
-
-  // Observe all videos
-  videos.forEach(video => {
-    videoObserver.observe(video);
-  });
-
-  // Add mobile-specific event listeners
-  if (window.innerWidth < 650) {
-    videos.forEach(video => {
-      // Handle mobile touch events
-      video.addEventListener('touchstart', () => {
-        if (video.paused) {
-          video.play();
-        } else {
-          video.pause();
-        }
-      });
-
-      // Handle mobile orientation changes
-      window.addEventListener('orientationchange', () => {
-        if (video.paused) {
-          video.load();
-        }
-      });
+    this.videoInstances.set(video, {
+      isPlaying: false,
+      hasLoaded: false
     });
   }
+
+  handleVideoIntersection(entry) {
+    const video = entry.target;
+    const videoData = this.videoInstances.get(video);
+    
+    if (entry.isIntersecting) {
+      this.playVideo(video, videoData);
+    } else {
+      this.pauseVideo(video, videoData);
+    }
+  }
+
+  playVideo(video, videoData) {
+    if (video.paused && videoData) {
+      if (this.optimizations.isMobile) {
+        video.muted = true;
+      }
+      
+      // Hide preview image when video starts playing
+      this.hideHTMLVideoPreview(video);
+      
+      const playPromise = video.play();
+      if (playPromise !== undefined) {
+        playPromise.catch(error => {
+          const container = video.closest('.video-container, #video-container');
+          if (container) {
+            container.classList.add('show-play-button');
+          }
+        });
+      }
+      
+      videoData.isPlaying = true;
+    }
+  }
+
+  pauseVideo(video, videoData) {
+    if (!video.paused && videoData) {
+      video.pause();
+      videoData.isPlaying = false;
+      
+      if (this.optimizations.isMobile) {
+        video.currentTime = 0;
+      }
+    }
+  }
+
+  setupEventListeners() {
+    // Track user interaction for mobile autoplay
+    if (this.optimizations.isMobile) {
+      const trackUserInteraction = () => {
+        document.hasUserInteracted = true;
+        document.removeEventListener('touchstart', trackUserInteraction);
+        document.removeEventListener('click', trackUserInteraction);
+      };
+      
+      document.addEventListener('touchstart', trackUserInteraction, { once: true });
+      document.addEventListener('click', trackUserInteraction, { once: true });
+    }
+
+    // Scroll listener removed for now to fix video display issues
+
+    // Memory management
+    if (this.optimizations.isMobile || this.optimizations.isLowEndDevice) {
+      this.setupMemoryManagement();
+    }
+
+    // Page visibility management
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        this.pauseAllVideos();
+      }
+    });
+  }
+
+
+  setupMemoryManagement() {
+    const memoryMonitor = () => {
+      if (performance.memory) {
+        const usedMemory = performance.memory.usedJSHeapSize;
+        const totalMemory = performance.memory.totalJSHeapSize;
+        const memoryUsage = usedMemory / totalMemory;
+        
+        if (memoryUsage > 0.8) {
+          this.cleanupOffScreenVideos();
+        }
+      }
+    };
+    
+    setInterval(memoryMonitor, 30000);
+  }
+
+  cleanupOffScreenVideos() {
+    // Cleanup Vimeo videos
+    this.vimeoInstances.forEach((player, iframe) => {
+      const rect = iframe.getBoundingClientRect();
+      const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+      
+      if (!isInViewport) {
+        this.unloadVimeoVideo(iframe);
+      }
+    });
+
+    // Cleanup HTML videos
+    this.videoInstances.forEach((videoData, video) => {
+      const rect = video.getBoundingClientRect();
+      const isInViewport = rect.top < window.innerHeight && rect.bottom > 0;
+      
+      if (!isInViewport && !video.paused) {
+        video.pause();
+        videoData.isPlaying = false;
+      }
+    });
+  }
+
+  pauseAllVideos() {
+    // Pause all Vimeo videos
+    this.vimeoInstances.forEach((player) => {
+      player.pause().catch(() => {});
+    });
+
+    // Pause all HTML videos
+    this.videoInstances.forEach((videoData, video) => {
+      if (!video.paused) {
+        video.pause();
+        videoData.isPlaying = false;
+      }
+    });
+  }
+
+  destroy() {
+    if (this.videoObserver) {
+      this.videoObserver.disconnect();
+    }
+    if (this.vimeoObserver) {
+      this.vimeoObserver.disconnect();
+    }
+    
+    this.vimeoInstances.forEach((player) => {
+      player.destroy().catch(() => {});
+    });
+    
+    this.videoInstances.clear();
+    this.vimeoInstances.clear();
+    this.initialized = false;
+  }
+}
+
+// Global video manager instance
+const videoManager = new VideoManager();
+
+// Initialize videos
+function initVideos() {
+  videoManager.init();
 }
 
 
 // ============================================================
-// VIDEO EVENT LISTENERS SETUP
+// OPTIMIZED VIDEO EVENT LISTENERS
 // ============================================================
 
 function setupVideoEventListeners() {
   // Initialize videos when DOM is ready
   document.addEventListener('DOMContentLoaded', () => {
     initVideos();
-    initVideoLazyLoad();
   });
 
   // Re-initialize videos after page transitions
@@ -411,102 +584,22 @@ function setupVideoEventListeners() {
 }
 
 // ============================================================
-// VIDEO LAZY LOADING
+// VIDEO CLEANUP FOR PAGE TRANSITIONS
 // ============================================================
 
-function initVideoLazyLoad() {
-  const showreelVideo = document.getElementById('showreel-video');
-  if (!showreelVideo) return;
-  
-  const videoContainer = showreelVideo.closest('.video-container');
-  if (!videoContainer) return;
-  
-  // Add loading indicator
-  videoContainer.classList.add('video-loading');
-  
-  // Create intersection observer for lazy loading
-  const videoObserver = new IntersectionObserver((entries, observer) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        const video = entry.target;
-        
-        // Start loading the video
-        video.setAttribute('preload', 'auto');
-        video.load();
-        
-        // Add event listeners for loading states
-        video.addEventListener('loadstart', () => {
-          videoContainer.classList.add('video-loading');
-        });
-        
-        video.addEventListener('canplay', () => {
-          videoContainer.classList.remove('video-loading');
-          videoContainer.classList.add('video-loaded');
-        });
-        
-        video.addEventListener('error', () => {
-          videoContainer.classList.remove('video-loading');
-          console.warn('Video failed to load');
-        });
-        
-        // Stop observing this video
-        observer.unobserve(video);
-      }
-    });
-  }, {
-    rootMargin: '50px 0px', // Start loading 50px before video comes into view
-    threshold: 0.1
-  });
-  
-  // Start observing the video
-  videoObserver.observe(showreelVideo);
-}
-
-
-// ============================================================
-// VIDEO LOADING HANDLERS
-// ============================================================
-
-function handleVideoLoad(video) {
-  const container = video.closest('.video-container, #video-container');
-  if (container) {
-    container.classList.remove('video-loading');
-    container.classList.add('video-loaded');
+function cleanupVideosForTransition() {
+  if (videoManager) {
+    videoManager.pauseAllVideos();
   }
 }
 
-function handleVideoError(video) {
-  const container = video.closest('.video-container, #video-container');
-  if (container) {
-    container.classList.remove('video-loading');
-    container.classList.add('video-error');
+function reinitializeVideosAfterTransition() {
+  if (videoManager) {
+    videoManager.destroy();
+    // Recreate the video manager
+    window.videoManager = new VideoManager();
+    initVideos();
   }
-}
-
-
-// ============================================================
-// VIDEO PROCESSING
-// ============================================================
-
-function processAllVideos() {
-  document.querySelectorAll('video').forEach(video => {
-    // Handle video buffering
-    video.addEventListener('waiting', () => {
-      video.classList.add('buffering');
-    });
-    
-    video.addEventListener('playing', () => {
-      video.classList.remove('buffering');
-    });
-
-    // Handle video errors and retry
-    video.addEventListener('error', (e) => {
-      handleVideoError(video);
-    });
-
-    // Add loading handlers
-    video.addEventListener('loadeddata', () => handleVideoLoad(video));
-  });
 }
 
 
@@ -710,6 +803,9 @@ function initInfinityGallery() {
         this.startY = 0;
         this.isHorizontalDrag = false;
         this.startTime = 0;
+        this.scrollProgress = 0;
+        this.manualDragOffset = 0;
+        this.isManualDrag = false;
         this.init();
     }
 
@@ -723,6 +819,7 @@ function initInfinityGallery() {
 
     bindEvents() {
         window.addEventListener("resize", this.calculate.bind(this));
+        window.addEventListener("scroll", this.handleScroll.bind(this));
         this.el.addEventListener("mousedown", (e) => this.handleStart(e));
         window.addEventListener("mousemove", (e) => this.handleMove(e));
         window.addEventListener("mouseup", (e) => this.handleEnd(e));
@@ -738,6 +835,36 @@ function initInfinityGallery() {
         const lastItem = this.items[this.items.length - 1];
         const lastItemRight = lastItem.offsetLeft + lastItem.offsetWidth;
         this.maxScroll = lastItemRight - this.el.clientWidth;
+        
+        // Calculate gallery position relative to viewport
+        const rect = this.el.getBoundingClientRect();
+        this.galleryTop = rect.top + window.scrollY;
+        this.galleryHeight = rect.height;
+        
+        // Reset scroll progress when recalculating
+        this.scrollProgress = 0;
+    }
+
+    handleScroll() {
+        if (this.isDragging || this.isManualDrag) return; // Don't scroll when dragging or after manual drag
+        
+        const scrollY = window.scrollY;
+        const galleryRect = this.el.getBoundingClientRect();
+        
+        // Check if gallery is in viewport
+        if (galleryRect.bottom < 0 || galleryRect.top > window.innerHeight) {
+            this.scrollProgress = 0;
+            return;
+        }
+        
+        // Calculate scroll progress through the gallery
+        // Start from when gallery enters viewport (top of gallery reaches top of viewport)
+        const galleryStart = this.galleryTop;
+        const galleryEnd = this.galleryTop + this.galleryHeight + window.innerHeight;
+        const scrollProgress = Math.max(0, Math.min(1, (scrollY - galleryStart + window.innerHeight) / (galleryEnd - galleryStart)));
+        
+        // Map scroll progress to gallery position
+        this.scrollProgress = scrollProgress * this.maxScroll;
     }
 
     handleStart(e) {
@@ -747,6 +874,8 @@ function initInfinityGallery() {
         this.startX = e.clientX || e.touches[0].clientX;
         this.startY = e.clientY || e.touches[0].clientY;
         this.startTime = Date.now();
+        // Store current position when starting manual drag
+        this.manualDragOffset = this.x;
     }
 
     handleMove(e) {
@@ -769,7 +898,8 @@ function initInfinityGallery() {
         if (this.isHorizontalDrag) {
             e.preventDefault();
             this.isDragging = true;
-            this.progress += -deltaX * 3.819;
+            this.isManualDrag = true;
+            this.progress += -deltaX * (window.innerWidth <= 650 ? 8 : 3.819);
             this.startX = currentX;
             this.startY = currentY;
             this.move();
@@ -780,6 +910,7 @@ function initInfinityGallery() {
         this.isMouseDown = false;
         if (this.isDragging) {
             this.isDragging = false;
+            // Keep manual drag state active to prevent scroll from overriding
             return;
         }
     }
@@ -795,7 +926,22 @@ function initInfinityGallery() {
     }
 
     raf() {
-        this.x += (this.progress - this.x) * 0.1;
+        // Use manual drag position if user has manually dragged, otherwise use scroll progress
+        let targetProgress;
+        if (this.isManualDrag) {
+            targetProgress = this.progress;
+        } else {
+            targetProgress = this.scrollProgress;
+        }
+        
+        // For scroll, stick directly to scroll position (no easing)
+        // For manual drag, use easing for smooth interaction
+        if (this.isManualDrag) {
+            this.x += (targetProgress - this.x) * 0.1;
+        } else {
+            this.x = targetProgress;
+        }
+        
         this.wrap.style.transform = `translateX(${-this.x}px)`;
         requestAnimationFrame(this.raf.bind(this));
     }
@@ -3402,11 +3548,11 @@ function initializeApplication() {
     setupSplitTextEventListeners();
     setupLinkClicksEventHandlers();
     initNavbarShowHide();
-    processAllVideos();
     initScrollRestoration();
-    initVimeoLazyLoad();
     setupMegaMenuEventListeners();
     initCustomSmoothScrolling();
+    // Initialize optimized video manager
+    initVideos();
   setTimeout(() => {
     initSplitTextAnimations();
   }, 800);
@@ -3417,7 +3563,6 @@ function initializeApplication() {
     extraTabs();
     tabsAccordion();
     initGridOverlayToggle();
-    setupVideoEventListeners();
     initImageParallax();
     initSvgAnimations();
     initImageTrail();
