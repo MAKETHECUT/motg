@@ -1795,7 +1795,7 @@ Project Page
   width: 100vw;
 }
 
-.rich-text {
+.w-richtext {
   grid-gap: 1vw;
   display: grid;
 }
