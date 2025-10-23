@@ -15,6 +15,10 @@ function initScrollRestoration() {
   document.body.scrollTop = 0;
 }
 
+
+
+
+
 // ============================================================
 // VIMEO IFRAME RESTORATION
 // ============================================================
@@ -230,6 +234,9 @@ function setupSplitTextEventListeners() {
 }
 
 
+
+
+
 // ============================================================
 // SHOWREEL TOGGLE
 // ============================================================
@@ -253,217 +260,217 @@ function initShowreelToggle() {
 // ============================================================
 
 function initInfinityGallery() {
-  class DragScroll {
-    constructor(obj) {
-        this.el = typeof obj.el === 'string' ? document.querySelector(obj.el) : obj.el;
-        this.wrap = this.el.querySelector(obj.wrap);
-        this.items = this.el.querySelectorAll(obj.item);
-        this.dragThreshold = 5;
-        this.isDragging = false;
-        this.isMouseDown = false;
-        this.startX = 0;
-        this.startY = 0;
-        this.isHorizontalDrag = false;
-        this.startTime = 0;
-        this.scrollProgress = 0;
-        this.manualDragOffset = 0;
-        this.isManualDrag = false;
-        this.init();
-    }
-
-    init() {
-        this.progress = 0;
-        this.x = 0;
-        this.bindEvents();
-        this.calculate();
-        this.raf();
-    }
-
-    bindEvents() {
-        window.addEventListener("resize", this.calculate.bind(this));
-        window.addEventListener("scroll", this.handleScroll.bind(this));
-        this.el.addEventListener("mousedown", (e) => this.handleStart(e));
-        window.addEventListener("mousemove", (e) => this.handleMove(e));
-        window.addEventListener("mouseup", (e) => this.handleEnd(e));
-        this.el.addEventListener("touchstart", (e) => this.handleStart(e));
-        window.addEventListener("touchmove", (e) => this.handleMove(e));
-        window.addEventListener("touchend", (e) => this.handleEnd(e));
-        this.el.addEventListener("dragstart", (e) => this.preventDragOnLinks(e));
-    }
-
-    calculate() {
-        this.wrapWidth = this.wrap.scrollWidth;
-        this.containerWidth = this.el.clientWidth;
-        const lastItem = this.items[this.items.length - 1];
-        const lastItemRight = lastItem.offsetLeft + lastItem.offsetWidth;
-        this.maxScroll = lastItemRight - this.el.clientWidth;
-        
-        // Calculate gallery position relative to viewport
-        const rect = this.el.getBoundingClientRect();
-        this.galleryTop = rect.top + window.scrollY;
-        this.galleryHeight = rect.height;
-        
-        // Preserve current scroll progress instead of resetting
-        // This prevents the gallery from jumping back to start when page is scrolled
-    }
-
-    handleScroll() {
-        if (this.isDragging || this.isManualDrag) return; // Don't scroll when dragging or after manual drag
-        
-        const scrollY = window.scrollY;
-        const galleryRect = this.el.getBoundingClientRect();
-        
-        // Check if gallery is in viewport
-        if (galleryRect.bottom < 0 || galleryRect.top > window.innerHeight) {
-            this.scrollProgress = 0;
-            return;
-        }
-        
-        // Calculate scroll progress through the gallery
-        // Start from when gallery enters viewport (top of gallery reaches top of viewport)
-        const galleryStart = this.galleryTop;
-        const galleryEnd = this.galleryTop + this.galleryHeight + window.innerHeight;
-        const scrollProgress = Math.max(0, Math.min(1, (scrollY - galleryStart + window.innerHeight) / (galleryEnd - galleryStart)));
-        
-        // Map scroll progress to gallery position
-        this.scrollProgress = scrollProgress * this.maxScroll;
-    }
-
-    handleStart(e) {
-        this.isDragging = false;
-        this.isMouseDown = true;
-        this.isHorizontalDrag = false;
-        this.startX = e.clientX || e.touches[0].clientX;
-        this.startY = e.clientY || e.touches[0].clientY;
-        this.startTime = Date.now();
-        // Store current position when starting manual drag
-        // Use the current scroll progress as the starting point for manual drag
-        this.manualDragOffset = this.isManualDrag ? this.progress : this.scrollProgress;
-        this.progress = this.manualDragOffset;
-    }
-
-    handleMove(e) {
-        if (!this.isMouseDown) return;
-
-        const currentX = e.clientX || e.touches[0].clientX;
-        const currentY = e.clientY || e.touches[0].clientY;
-
-        const deltaX = currentX - this.startX;
-        const deltaY = currentY - this.startY;
-
-        if (!this.isHorizontalDrag) {
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > this.dragThreshold) {
-                this.isHorizontalDrag = true;
-            } else if (Math.abs(deltaY) > this.dragThreshold) {
-                return;
-            }
-        }
-
-        if (this.isHorizontalDrag) {
-            e.preventDefault();
-            this.isDragging = true;
-            this.isManualDrag = true;
-            this.progress += -deltaX * (window.innerWidth <= 650 ? 8 : 3.819);
-            this.startX = currentX;
-            this.startY = currentY;
-            this.move();
-        }
-    }
-
-    handleEnd(e) {
-        this.isMouseDown = false;
-        if (this.isDragging) {
-            this.isDragging = false;
-            // Keep manual drag state active to prevent scroll from overriding
-            return;
-        }
-    }
-
-    preventDragOnLinks(e) {
-        if (e.target.tagName === "A") {
-            e.preventDefault();
-        }
-    }
-
-    move() {
-        this.progress = Math.max(0, Math.min(this.progress, this.maxScroll));
-    }
-
-    raf() {
-        // Use manual drag position if user has manually dragged, otherwise use scroll progress
-        let targetProgress;
-        if (this.isManualDrag) {
-            targetProgress = this.progress;
-        } else {
-            targetProgress = this.scrollProgress;
-        }
-        
-        // For scroll, stick directly to scroll position (no easing)
-        // For manual drag, use easing for smooth interaction
-        if (this.isManualDrag) {
-            this.x += (targetProgress - this.x) * 0.1;
-        } else {
-            this.x = targetProgress;
-        }
-        
-        this.wrap.style.transform = `translateX(${-this.x}px)`;
-        requestAnimationFrame(this.raf.bind(this));
-    }
-}
-
-// Initialize galleries with individual triggers
-const galleries = document.querySelectorAll('.gallery');
-galleries.forEach((gallery, index) => {
-    // Check if gallery is already visible on page load
-    const rect = gallery.getBoundingClientRect();
-    const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
-    
-    if (isVisible) {
-        // Initialize immediately if gallery is already visible
-        const slider = new DragScroll({
-            el: gallery,
-            wrap: ".gallery-wrapper",
-            item: ".gallery-item",
-        });
-        slider.calculate();
-        gallery.setAttribute('data-gallery-initialized', 'true');
-    } else {
-        // Create individual trigger for each gallery
-        const trigger = ScrollTrigger.create({
-            trigger: gallery,
-            start: "top 80%", // Trigger when gallery is 80% from top of viewport
-            onEnter: () => {
-                // Only initialize if not already initialized
-                if (!gallery.hasAttribute('data-gallery-initialized')) {
-                    const slider = new DragScroll({
-                        el: gallery,
-                        wrap: ".gallery-wrapper",
-                        item: ".gallery-item",
-                    });
-                    slider.calculate();
-                    gallery.setAttribute('data-gallery-initialized', 'true');
-                }
-            },
-            onLeave: () => {
-                // Optional: cleanup when leaving gallery
-            },
-            onEnterBack: () => {
-                // Re-initialize when scrolling back up
-                if (gallery.hasAttribute('data-gallery-initialized')) {
-                    const slider = new DragScroll({
-                        el: gallery,
-                        wrap: ".gallery-wrapper",
-                        item: ".gallery-item",
-                    });
-                    slider.calculate();
-                }
-            }
-        });
-    }
-});
-
-}
-
+    class DragScroll {
+      constructor(obj) {
+          this.el = typeof obj.el === 'string' ? document.querySelector(obj.el) : obj.el;
+          this.wrap = this.el.querySelector(obj.wrap);
+          this.items = this.el.querySelectorAll(obj.item);
+          this.dragThreshold = 5;
+          this.isDragging = false;
+          this.isMouseDown = false;
+          this.startX = 0;
+          this.startY = 0;
+          this.isHorizontalDrag = false;
+          this.startTime = 0;
+          this.scrollProgress = 0;
+          this.manualDragOffset = 0;
+          this.isManualDrag = false;
+          this.init();
+      }
+  
+      init() {
+          this.progress = 0;
+          this.x = 0;
+          this.bindEvents();
+          this.calculate();
+          this.raf();
+      }
+  
+      bindEvents() {
+          window.addEventListener("resize", this.calculate.bind(this));
+          window.addEventListener("scroll", this.handleScroll.bind(this));
+          this.el.addEventListener("mousedown", (e) => this.handleStart(e));
+          window.addEventListener("mousemove", (e) => this.handleMove(e));
+          window.addEventListener("mouseup", (e) => this.handleEnd(e));
+          this.el.addEventListener("touchstart", (e) => this.handleStart(e));
+          window.addEventListener("touchmove", (e) => this.handleMove(e));
+          window.addEventListener("touchend", (e) => this.handleEnd(e));
+          this.el.addEventListener("dragstart", (e) => this.preventDragOnLinks(e));
+      }
+  
+      calculate() {
+          this.wrapWidth = this.wrap.scrollWidth;
+          this.containerWidth = this.el.clientWidth;
+          const lastItem = this.items[this.items.length - 1];
+          const lastItemRight = lastItem.offsetLeft + lastItem.offsetWidth;
+          this.maxScroll = lastItemRight - this.el.clientWidth;
+          
+          // Calculate gallery position relative to viewport
+          const rect = this.el.getBoundingClientRect();
+          this.galleryTop = rect.top + window.scrollY;
+          this.galleryHeight = rect.height;
+          
+          // Preserve current scroll progress instead of resetting
+          // This prevents the gallery from jumping back to start when page is scrolled
+      }
+  
+      handleScroll() {
+          if (this.isDragging || this.isManualDrag) return; // Don't scroll when dragging or after manual drag
+          
+          const scrollY = window.scrollY;
+          const galleryRect = this.el.getBoundingClientRect();
+          
+          // Check if gallery is in viewport
+          if (galleryRect.bottom < 0 || galleryRect.top > window.innerHeight) {
+              this.scrollProgress = 0;
+              return;
+          }
+          
+          // Calculate scroll progress through the gallery
+          // Start from when gallery enters viewport (top of gallery reaches top of viewport)
+          const galleryStart = this.galleryTop;
+          const galleryEnd = this.galleryTop + this.galleryHeight + window.innerHeight;
+          const scrollProgress = Math.max(0, Math.min(1, (scrollY - galleryStart + window.innerHeight) / (galleryEnd - galleryStart)));
+          
+          // Map scroll progress to gallery position
+          this.scrollProgress = scrollProgress * this.maxScroll;
+      }
+  
+      handleStart(e) {
+          this.isDragging = false;
+          this.isMouseDown = true;
+          this.isHorizontalDrag = false;
+          this.startX = e.clientX || e.touches[0].clientX;
+          this.startY = e.clientY || e.touches[0].clientY;
+          this.startTime = Date.now();
+          // Store current position when starting manual drag
+          // Use the current scroll progress as the starting point for manual drag
+          this.manualDragOffset = this.isManualDrag ? this.progress : this.scrollProgress;
+          this.progress = this.manualDragOffset;
+      }
+  
+      handleMove(e) {
+          if (!this.isMouseDown) return;
+  
+          const currentX = e.clientX || e.touches[0].clientX;
+          const currentY = e.clientY || e.touches[0].clientY;
+  
+          const deltaX = currentX - this.startX;
+          const deltaY = currentY - this.startY;
+  
+          if (!this.isHorizontalDrag) {
+              if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > this.dragThreshold) {
+                  this.isHorizontalDrag = true;
+              } else if (Math.abs(deltaY) > this.dragThreshold) {
+                  return;
+              }
+          }
+  
+          if (this.isHorizontalDrag) {
+              e.preventDefault();
+              this.isDragging = true;
+              this.isManualDrag = true;
+              this.progress += -deltaX * (window.innerWidth <= 650 ? 8 : 3.819);
+              this.startX = currentX;
+              this.startY = currentY;
+              this.move();
+          }
+      }
+  
+      handleEnd(e) {
+          this.isMouseDown = false;
+          if (this.isDragging) {
+              this.isDragging = false;
+              // Keep manual drag state active to prevent scroll from overriding
+              return;
+          }
+      }
+  
+      preventDragOnLinks(e) {
+          if (e.target.tagName === "A") {
+              e.preventDefault();
+          }
+      }
+  
+      move() {
+          this.progress = Math.max(0, Math.min(this.progress, this.maxScroll));
+      }
+  
+      raf() {
+          // Use manual drag position if user has manually dragged, otherwise use scroll progress
+          let targetProgress;
+          if (this.isManualDrag) {
+              targetProgress = this.progress;
+          } else {
+              targetProgress = this.scrollProgress;
+          }
+          
+          // For scroll, stick directly to scroll position (no easing)
+          // For manual drag, use easing for smooth interaction
+          if (this.isManualDrag) {
+              this.x += (targetProgress - this.x) * 0.1;
+          } else {
+              this.x = targetProgress;
+          }
+          
+          this.wrap.style.transform = `translateX(${-this.x}px)`;
+          requestAnimationFrame(this.raf.bind(this));
+      }
+  }
+  
+  // Initialize galleries with individual triggers
+  const galleries = document.querySelectorAll('.gallery');
+  galleries.forEach((gallery, index) => {
+      // Check if gallery is already visible on page load
+      const rect = gallery.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+      
+      if (isVisible) {
+          // Initialize immediately if gallery is already visible
+          const slider = new DragScroll({
+              el: gallery,
+              wrap: ".gallery-wrapper",
+              item: ".gallery-item",
+          });
+          slider.calculate();
+          gallery.setAttribute('data-gallery-initialized', 'true');
+      } else {
+          // Create individual trigger for each gallery
+          const trigger = ScrollTrigger.create({
+              trigger: gallery,
+              start: "top 80%", // Trigger when gallery is 80% from top of viewport
+              onEnter: () => {
+                  // Only initialize if not already initialized
+                  if (!gallery.hasAttribute('data-gallery-initialized')) {
+                      const slider = new DragScroll({
+                          el: gallery,
+                          wrap: ".gallery-wrapper",
+                          item: ".gallery-item",
+                      });
+                      slider.calculate();
+                      gallery.setAttribute('data-gallery-initialized', 'true');
+                  }
+              },
+              onLeave: () => {
+                  // Optional: cleanup when leaving gallery
+              },
+              onEnterBack: () => {
+                  // Re-initialize when scrolling back up
+                  if (gallery.hasAttribute('data-gallery-initialized')) {
+                      const slider = new DragScroll({
+                          el: gallery,
+                          wrap: ".gallery-wrapper",
+                          item: ".gallery-item",
+                      });
+                      slider.calculate();
+                  }
+              }
+          });
+      }
+  });
+  
+  }
+  
 
 
 // ============================================================
@@ -3089,6 +3096,205 @@ function initScrollDelay() {
     }, 2000);
 }
 
+
+
+
+/* ==============================================
+Slider Infinifty
+============================================== */
+
+
+function sliderInfinity() {
+    class InfiniteHorizontalScroll {
+    constructor(container) {
+      if (!container) return;
+      this.container = container;
+      this.items = Array.from(this.container.children);
+      if (this.items.length === 0) return;
+      this.scrollX = 0;
+      this.smoothScrollX = 0;
+      this.touchStartY = 0;
+      this.touchDeltaY = 0;
+      this.previousDeltaY = 0;
+      this.mouseStartX = 0;
+      this.mouseDeltaX = 0;
+      this.previousDeltaX = 0;
+      this.isDragging = false;
+      this.autoplaySpeed = 1;
+      this.autoplayInterval = null;
+      this.isAutoplayPaused = false;
+      this.cloneItems();
+      this.calculateDimensions();
+      this.init();
+    }
+    
+    cloneItems() {
+      const fragmentBefore = document.createDocumentFragment();
+      const fragmentAfter = document.createDocumentFragment();
+      this.items.forEach((item) => {
+        const cloneBefore = item.cloneNode(true);
+        const cloneAfter = item.cloneNode(true);
+        fragmentBefore.appendChild(cloneBefore);
+        fragmentAfter.appendChild(cloneAfter);
+      });
+      this.container.insertBefore(fragmentBefore, this.container.firstChild);
+      this.container.appendChild(fragmentAfter);
+    }
+    
+    calculateDimensions() {
+      this.totalWidth = 0;
+      Array.from(this.container.children).forEach((item) => {
+        const itemRect = item.getBoundingClientRect();
+        const computedStyle = getComputedStyle(item);
+        const marginRight = parseFloat(computedStyle.marginRight) || 0;
+        this.totalWidth += itemRect.width + marginRight;
+      });
+      const originalWidth = this.totalWidth / 3;
+      this.scrollX = originalWidth;
+      this.smoothScrollX = originalWidth;
+      this.container.style.transform = `translateX(${-this.scrollX}px)`;
+    }
+    
+    init() {
+      this.bindEvents();
+      this.animate();
+      this.startAutoplay();
+      window.addEventListener("resize", () => {
+        this.calculateDimensions();
+        this.resetPosition();
+      });
+    }
+    
+    bindEvents() {
+      document.addEventListener("wheel", (e) => this.handleWheel(e), { passive: false });
+      document.addEventListener("touchstart", (e) => this.handleTouchStart(e), { passive: true });
+      document.addEventListener("touchmove", (e) => this.handleTouchMove(e), { passive: false });
+      document.addEventListener("touchend", () => this.handleTouchEnd());
+      document.addEventListener("mousedown", (e) => this.handleMouseDown(e), { passive: false });
+      document.addEventListener("mousemove", (e) => this.handleMouseMove(e), { passive: false });
+      document.addEventListener("mouseup", () => this.handleMouseUp());
+      document.addEventListener("mouseleave", () => this.handleMouseUp());
+    }
+    
+    handleWheel(event) {
+      if (event.target.closest("button, input, textarea, select")) return;
+      event.preventDefault();
+      this.pauseAutoplay();
+      this.scrollX += event.deltaY * 1.5;
+      this.handleInfiniteScroll();
+      this.resumeAutoplayAfterDelay();
+    }
+    
+    handleTouchStart(event) {
+      this.pauseAutoplay();
+      this.touchStartY = event.touches[0].clientY;
+      this.touchDeltaY = 0;
+      this.previousDeltaY = 0;
+    }
+    
+    handleTouchMove(event) {
+      event.preventDefault();
+      if (window.innerWidth < 750) {
+        const touchY = event.touches[0].clientY;
+        this.touchDeltaY = touchY - this.touchStartY;
+        const touchSpeed = 4;
+        this.scrollX -= (this.touchDeltaY - this.previousDeltaY) * touchSpeed;
+        this.previousDeltaY = this.touchDeltaY;
+      }
+      this.handleInfiniteScroll();
+    }
+    
+    handleTouchEnd() {
+      this.touchDeltaY = 0;
+      this.previousDeltaY = 0;
+      this.resumeAutoplayAfterDelay();
+    }
+    
+    handleInfiniteScroll() {
+      const originalWidth = this.totalWidth / 3;
+      if (this.scrollX < 0) {
+        this.scrollX += originalWidth;
+        this.smoothScrollX += originalWidth;
+      } else if (this.scrollX > this.totalWidth - originalWidth) {
+        this.scrollX -= originalWidth;
+        this.smoothScrollX -= originalWidth;
+      }
+    }
+    
+    handleMouseDown(event) {
+      this.pauseAutoplay();
+      this.isDragging = true;
+      this.mouseStartX = event.clientX;
+      this.mouseDeltaX = 0;
+      this.previousDeltaX = 0;
+      event.preventDefault();
+    }
+    
+    handleMouseMove(event) {
+      if (!this.isDragging) return;
+      event.preventDefault();
+      const mouseX = event.clientX;
+      this.mouseDeltaX = mouseX - this.mouseStartX;
+      const mouseSpeed = 2;
+      this.scrollX -= (this.mouseDeltaX - this.previousDeltaX) * mouseSpeed;
+      this.previousDeltaX = this.mouseDeltaX;
+      this.handleInfiniteScroll();
+    }
+    
+    handleMouseUp() {
+      if (this.isDragging) {
+        this.isDragging = false;
+        this.mouseDeltaX = 0;
+        this.previousDeltaX = 0;
+        this.resumeAutoplayAfterDelay();
+      }
+    }
+    
+    startAutoplay() {
+      this.autoplayInterval = setInterval(() => {
+        if (!this.isAutoplayPaused) {
+          this.scrollX += this.autoplaySpeed;
+          this.handleInfiniteScroll();
+        }
+      }, 16);
+    }
+    
+    pauseAutoplay() {
+      this.isAutoplayPaused = true;
+    }
+    
+    resumeAutoplayAfterDelay() {
+      clearTimeout(this.autoplayTimeout);
+      this.isAutoplayPaused = false;
+    }
+    
+    resetPosition() {
+      const originalWidth = this.totalWidth / 3;
+      this.scrollX = originalWidth;
+      this.smoothScrollX = originalWidth;
+      this.container.style.transform = `translateX(${-this.scrollX}px)`;
+    }
+    
+    animate() {
+      this.smoothScrollX += (this.scrollX - this.smoothScrollX) * 0.06;
+      this.container.style.transform = `translateX(${-this.smoothScrollX}px)`;
+      requestAnimationFrame(() => this.animate());
+    }
+    }
+    
+    // Initialize for all galleries that should have infinite scroll
+    const gallerySelectors = [".works-container", ".gallery-container", ".infinite-scroll"];
+    gallerySelectors.forEach(selector => {
+      const containers = document.querySelectorAll(selector);
+      containers.forEach(container => {
+        new InfiniteHorizontalScroll(container);
+      });
+    });
+    }
+    
+
+    sliderInfinity();
+
 // ============================================================
 // MASTER INITIALIZATION - SINGLE ENTRY POINT
 // ============================================================
@@ -3097,9 +3303,8 @@ function initScrollDelay() {
 function initializeApplication() {
     // Disable scroll for 2 seconds to allow galleries and videos to load
     initScrollDelay();
-    
-    initSliderMarquee();
-    initLogosLoop();
+
+/*    initLogosLoop();*/
     initGsapAnimations();
     setupSplitTextEventListeners();
     setupLinkClicksEventHandlers();
@@ -3112,14 +3317,15 @@ function initializeApplication() {
   setTimeout(() => {
     initSplitTextAnimations();
   }, 800);
+
     initInteractiveCursor();
     refreshbreakingpoints();
     initShowreelToggle();
-    initInfinityGallery();
     extraTabs();
     tabsAccordion();
     initGridOverlayToggle();
     initImageParallax();
+    initInfinityGallery();
     initSvgAnimations();
     initImageTrail();
  
@@ -3131,60 +3337,5 @@ initializeApplication();
 
 
 
-// ============================================================
-// INFINITE SLIDER MARQUEE ANIMATION
-// ============================================================
 
-function applyDynamicMarqueeAnimation(sliderSelector, itemSelector, durationSeconds = 40) {
-    const slider = document.querySelector(sliderSelector);
-    if (!slider) return;
-  
-    const wrapper = slider.querySelector(".slider-wrapper");
-    if (!wrapper) return;
-  
-    const items = Array.from(wrapper.querySelectorAll(itemSelector));
-    if (items.length === 0) return;
-  
-    // Clone items for seamless loop
-    items.forEach(item => {
-      const clone = item.cloneNode(true);
-      wrapper.appendChild(clone);
-    });
-  
-    // Create animation immediately without waiting for images
-    requestAnimationFrame(() => {
-      const allItems = wrapper.querySelectorAll(itemSelector);
-      const itemWidth = allItems[0].offsetWidth;
-      const gap = parseFloat(getComputedStyle(wrapper).gap) || 0;
-      const visibleCount = items.length;
-  
-      const scrollDistance = visibleCount * itemWidth + (visibleCount - 1) * gap;
-      const totalWidth = allItems.length * itemWidth + (allItems.length - 1) * gap;
-  
-      wrapper.style.width = `${totalWidth}px`;
-  
-      const animationName = "dynamic-marquee-" + Math.floor(Math.random() * 1000000);
-  
-      const style = document.createElement("style");
-      style.textContent = `
-        @keyframes ${animationName} {
-          0%   { transform: translateX(0); }
-          100% { transform: translateX(-${scrollDistance}px); }
-        }
-  
-        ${sliderSelector} .slider-wrapper {
-          animation: ${animationName} ${durationSeconds}s linear infinite;
-        }
-      `;
-      document.head.appendChild(style);
-    });
-  }
-  
-  function initSliderMarquee() {
-    // Small delay to ensure DOM is ready
-    setTimeout(() => {
-      const duration = 100;
-      applyDynamicMarqueeAnimation(".slider", ".slider-item", duration);
-    }, 100);
-  }
-        
+
