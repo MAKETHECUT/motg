@@ -2811,15 +2811,25 @@ About Page
     margin-top: 10vw;
   }
 
+  .works-slider {
+    margin: 15vw 0;
+  }
+
   .work-slide {
-    min-width:50vw;
+    min-width:60vw;
   }
   
   .work-slide img {
-   min-height:60vw;
+   min-height:70vw;
   }
-  
 
+  .about-page .work-slide {
+    min-width:60vw;
+  }
+
+  .about-page .work-slide img {
+    min-height:60vw;
+  }
   
 }
 
