@@ -2913,8 +2913,12 @@ function initInteractiveCursor() {
     });
 
     document.querySelectorAll(".click-disable").forEach(el => {
-        el.addEventListener("mouseenter", () => cursor.classList.add("soon"));
-        el.addEventListener("mouseleave", () => cursor.classList.remove("soon"));
+        // Only attach events if .click-disable is NOT inside a .work-content ancestor
+        let insideWorkContent = !!el.closest('.work-content, .project-cover');
+        if (!insideWorkContent) {
+            el.addEventListener("mouseenter", () => cursor.classList.add("soon"));
+            el.addEventListener("mouseleave", () => cursor.classList.remove("soon"));
+        }
     });
 
 /*
