@@ -3120,7 +3120,7 @@ function sliderInfinity() {
       this.mouseDeltaX = 0;
       this.previousDeltaX = 0;
       this.isDragging = false;
-      this.autoplaySpeed = 1;
+      this.autoplaySpeed = 2;
       this.autoplayInterval = null;
       this.isAutoplayPaused = false;
       this.cloneItems();
@@ -3333,7 +3333,6 @@ function initializeApplication() {
 
 // SINGLE INITIALIZATION CALL
 initializeApplication();
-
 
 
 
