@@ -1721,12 +1721,12 @@ Project Page
 
 .gallery-wrapper {
   display: flex;
-  gap: 3.819vw;
+  gap: 0; /* Remove gap to eliminate container width space between loops */
   will-change: transform;
 }
 
 .gallery-item {
-
+  margin-right: 3.819vw;
   height: fit-content;
   min-width: 85vw;
 }
@@ -2443,11 +2443,19 @@ About Page
 
 
 .slider {
-  overflow: hidden;
-  width: 100%;
+
+  width: 100vw;
   height: 30vw;
   margin: 8vw 0vw;
-   cursor:pointer;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.slider:active {
+  cursor: grabbing;
 }
 
 .slider-wrapper {
@@ -2466,6 +2474,60 @@ About Page
   height: 100%;
   object-fit: cover;
 }
+
+
+
+
+
+
+
+
+
+
+
+.works-slider {
+  grid-column: 1 / 13;
+  width:100%;
+
+  margin: 8vw 0vw;
+  z-index:0;
+  cursor:grabbing;
+}
+
+.works-container {
+  display:flex;
+  width: 100vw;
+}
+
+.work-slide {
+  min-width:30vw;
+  margin-right: 3.819vw;
+  grid-gap: 1vw;
+  display: grid;
+  position:relative;
+}
+
+.work-slide img {
+  width: 100%;
+  height: 35vw;
+  object-fit:cover;
+}
+
+.work-slide .image {
+  overflow: hidden;
+}
+
+.work-slide h5 {
+  margin-bottom:1vw;
+}
+
+
+
+
+
+
+
+
 
 
 .about-page section:nth-of-type(14) .center h1 {
@@ -2742,6 +2804,16 @@ About Page
     grid-gap: 3vw;
     margin-top: 10vw;
   }
+
+  .work-slide {
+    min-width:50vw;
+  }
+  
+  .work-slide img {
+   min-height:60vw;
+  }
+  
+
   
 }
 
