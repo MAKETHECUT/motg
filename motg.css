@@ -2513,6 +2513,12 @@ About Page
   object-fit:cover;
 }
 
+.about-page .work-slide img {
+  width: 100%;
+  height: 30vw;
+  object-fit:cover;
+}
+
 .work-slide .image {
   overflow: hidden;
 }
