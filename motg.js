@@ -2875,10 +2875,12 @@ function initInteractiveCursor() {
     }
 
     function handleMouseDown() {
+/*
         dragTimeout = setTimeout(() => {
             isDragging = true;
             cursor.classList.add("drag");
         }, 150);
+        */
     }
 
     function handleMouseMove() {
