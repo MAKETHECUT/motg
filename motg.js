@@ -1994,10 +1994,12 @@ if (isMobile) {
 
   gsap.set(playThumb, { opacity: 0, pointerEvents: "auto" });
 
+/*
   playThumb.addEventListener("click", () => {
     thumbClicked = true;
     playThumb.textContent = "Click to Pause";
   });
+
 
   ScrollTrigger.create({
     trigger: ".hero",
@@ -2013,6 +2015,9 @@ if (isMobile) {
       }
     }
   });
+
+    */
+   
 }
   
 
@@ -2907,6 +2912,7 @@ function initInteractiveCursor() {
         el.addEventListener("mouseleave", () => cursor.classList.remove("soon"));
     });
 
+/*
 document.querySelectorAll(".video-visual").forEach(el => {
     el.addEventListener("mouseenter", () => {
         cursor.classList.add("play");
@@ -2928,6 +2934,7 @@ document.querySelectorAll(".video-visual").forEach(el => {
         }
     });
 });
+*/
 
 
 
