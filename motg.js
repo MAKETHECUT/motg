@@ -3113,9 +3113,9 @@ function sliderInfinity() {
       if (this.items.length === 0) return;
       this.scrollX = 0;
       this.smoothScrollX = 0;
-      this.touchStartY = 0;
-      this.touchDeltaY = 0;
-      this.previousDeltaY = 0;
+      this.touchStartX = 0;
+      this.touchDeltaX = 0;
+      this.previousDeltaX = 0;
       this.mouseStartX = 0;
       this.mouseDeltaX = 0;
       this.previousDeltaX = 0;
@@ -3187,26 +3187,24 @@ function sliderInfinity() {
     
     handleTouchStart(event) {
       this.pauseAutoplay();
-      this.touchStartY = event.touches[0].clientY;
-      this.touchDeltaY = 0;
-      this.previousDeltaY = 0;
+      this.touchStartX = event.touches[0].clientX;
+      this.touchDeltaX = 0;
+      this.previousDeltaX = 0;
     }
     
     handleTouchMove(event) {
       event.preventDefault();
-      if (window.innerWidth < 750) {
-        const touchY = event.touches[0].clientY;
-        this.touchDeltaY = touchY - this.touchStartY;
-        const touchSpeed = 4;
-        this.scrollX -= (this.touchDeltaY - this.previousDeltaY) * touchSpeed;
-        this.previousDeltaY = this.touchDeltaY;
-      }
+      const touchX = event.touches[0].clientX;
+      this.touchDeltaX = touchX - this.touchStartX;
+      const touchSpeed = 2;
+      this.scrollX -= (this.touchDeltaX - this.previousDeltaX) * touchSpeed;
+      this.previousDeltaX = this.touchDeltaX;
       this.handleInfiniteScroll();
     }
     
     handleTouchEnd() {
-      this.touchDeltaY = 0;
-      this.previousDeltaY = 0;
+      this.touchDeltaX = 0;
+      this.previousDeltaX = 0;
       this.resumeAutoplayAfterDelay();
     }
     
