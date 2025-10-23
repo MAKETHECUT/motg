@@ -2163,8 +2163,11 @@ function initMegaMenu() {
 
         const minCount = Math.ceil((wrapperHeight * 3) / menuItemHeight);
         let items = [];
-        while (items.length < minCount) items = items.concat(originalItems);
-        items = items.slice(0, minCount);
+        // Repeat complete sets of original items until we have enough
+        const fullSets = Math.ceil(minCount / originalItems.length);
+        for (let i = 0; i < fullSets; i++) {
+            items = items.concat(originalItems);
+        }
 
         items.forEach(el => {
             // Ensure menu items are <a> tags for clickability
