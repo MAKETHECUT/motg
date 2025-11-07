@@ -1264,7 +1264,7 @@ iframe {
 }
 
 .image-wrapper img {
-	object-fit: cover;
+	object-fit: contain;
 	min-height: 100%;
 	width: 100%;
 }
