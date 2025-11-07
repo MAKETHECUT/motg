@@ -1254,7 +1254,7 @@ iframe {
 
 .work-img {
 	height: 51.968vw;
-	background: var(--lightgrey);
+	/*background: var(--lightgrey);*/
 }
 
 .image-wrapper, .video-wrapper {
