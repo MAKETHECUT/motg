@@ -160,15 +160,21 @@ const elements = Array.from(document.querySelectorAll(
             }
         });
 
-        tl.to(split.lines, {
+        const isHeroHeading = element.closest(".hero") && /^H[1-6]$/.test(element.tagName);
+        const animationConfig = {
             yPercent: 0,
             clipPath: "inset(-20% -10% -30% 0%)",
             opacity: 1,
             stagger: 0.12,
             duration: 1.5,
-            delay: element.closest(".hero, .hero-wait") ? 0 : 0,
             ease: "power4.out"
-        });
+        };
+
+        if (isHeroHeading) {
+            animationConfig.delay = 0.7;
+        }
+
+        tl.to(split.lines, animationConfig);
     });
 
     // Force ScrollTrigger to recalculate all measurements
@@ -2466,10 +2472,11 @@ megaMenuContainer.addEventListener('touchend', () => {
 // ============================================================
 
 function setupMegaMenuEventListeners() {
-  document.addEventListener('DOMContentLoaded', () => {
+  const initializeMenu = () => {
       initMegaMenu();
       const menuToggle = document.querySelector('.menu-toggle');
-      if (menuToggle) {
+      if (menuToggle && !menuToggle.dataset.megaMenuBound) {
+          menuToggle.dataset.megaMenuBound = "true";
           menuToggle.addEventListener('click', () => {
               if (megaMenuState) {
                   megaMenuState.toggle(menuToggle);
@@ -2477,7 +2484,13 @@ function setupMegaMenuEventListeners() {
               }
           });
       }
-  });
+  };
+
+  if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', initializeMenu, { once: true });
+  } else {
+      initializeMenu();
+  }
 
   window.addEventListener('resize', () => {
       if (megaMenuState && typeof megaMenuState.refresh === 'function') {
@@ -2602,11 +2615,17 @@ function initCustomSmoothScrolling() {
 
             // Completely disable mouse dragging by preventing any mouse events from affecting scroll
             window.addEventListener("mousedown", (e) => {
+                if (e.target.closest('input, textarea, select, button, [contenteditable], .w-input, .w-select, .w-checkbox-input, .w-radio-input')) {
+                    return;
+                }
                 e.preventDefault();
                 return false;
             }, { passive: false });
             
             window.addEventListener("mousemove", (e) => {
+                if (e.target.closest('input, textarea, select, button, [contenteditable], .w-input, .w-select, .w-checkbox-input, .w-radio-input')) {
+                    return;
+                }
                 // Prevent any mouse movement from affecting scroll
                 return false;
             }, { passive: false });
@@ -3313,9 +3332,9 @@ function initializeApplication() {
     initCustomSmoothScrolling();
     // Initialize Vimeo videos
     initVimeoVideos();
-  setTimeout(() => {
+
     initSplitTextAnimations();
-  }, 800);
+
 
     initInteractiveCursor();
     refreshbreakingpoints();
@@ -3331,8 +3350,11 @@ function initializeApplication() {
 }
 
 // SINGLE INITIALIZATION CALL
-initializeApplication();
-
+if (document.readyState === "complete") {
+  initializeApplication();
+} else {
+  window.addEventListener("load", initializeApplication, { once: true });
+}
 
 
 
