@@ -1,7 +1,7 @@
 
 gsap.registerPlugin(SplitText, ScrollTrigger);
 
-
+initializeApplication();
 
 
 // ============================================================
@@ -3349,12 +3349,7 @@ function initializeApplication() {
  
 }
 
-// SINGLE INITIALIZATION CALL
-if (document.readyState === "complete") {
-  initializeApplication();
-} else {
-  window.addEventListener("load", initializeApplication, { once: true });
-}
+
 
 
 
