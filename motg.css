@@ -1782,8 +1782,9 @@ Project Page
 @media (max-width: 650px) {
   
   .project-hero {
-    padding:30vw 8vw!important;
-    padding-bottom: unset;
+		padding: 0vw 8vw !important;
+        padding-top: 35vw !important;
+        padding-bottom: 20vw !important;
   }
   
   .project-hero .center {
