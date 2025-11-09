@@ -1,7 +1,7 @@
 
 gsap.registerPlugin(SplitText, ScrollTrigger);
 
-initializeApplication();
+
 
 
 // ============================================================
@@ -3350,6 +3350,6 @@ function initializeApplication() {
 }
 
 
-
+  initializeApplication();
 
 
