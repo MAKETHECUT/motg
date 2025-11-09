@@ -1850,7 +1850,7 @@ Project Page
   
   .full-width {
     width: var(--mobile-width);
-    min-height: 50svh;
+    /*min-height: 50svh;*/
     margin: auto;
     display: grid;
     grid-gap: 8vw;
