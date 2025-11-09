@@ -1898,7 +1898,7 @@ a {
 }
 
 .meet-our-crew .block {
-  grid-column: 1 / 13;
+  grid-column: 4 / 9;
   display: grid;
   grid-gap: 3vw;
 }
@@ -1917,6 +1917,8 @@ a {
   width: 100%;
   margin-bottom: 6.205vw;
 }
+
+
 
 .meet-our-crew .member:nth-of-type(even) {
 /*  margin-top: 34vw;*/
