@@ -1,5 +1,10 @@
 
-gsap.registerPlugin(SplitText, ScrollTrigger);
+// Register GSAP plugins only if they're available
+if (typeof gsap !== 'undefined' && typeof SplitText !== 'undefined' && typeof ScrollTrigger !== 'undefined') {
+  gsap.registerPlugin(SplitText, ScrollTrigger);
+} else {
+  console.error('GSAP plugins not loaded. Make sure GSAP, ScrollTrigger, and SplitText are loaded before app.js');
+}
 
 
 
@@ -269,8 +274,16 @@ function initInfinityGallery() {
     class DragScroll {
       constructor(obj) {
           this.el = typeof obj.el === 'string' ? document.querySelector(obj.el) : obj.el;
+          if (!this.el) {
+              console.warn('DragScroll: Element not found', obj.el);
+              return;
+          }
           this.wrap = this.el.querySelector(obj.wrap);
           this.items = this.el.querySelectorAll(obj.item);
+          if (!this.wrap || !this.items || this.items.length === 0) {
+              console.warn('DragScroll: Gallery wrapper or items not found');
+              return;
+          }
           this.dragThreshold = 5;
           this.isDragging = false;
           this.isMouseDown = false;
@@ -285,6 +298,9 @@ function initInfinityGallery() {
       }
   
       init() {
+          if (!this.el || !this.wrap || !this.items || this.items.length === 0) {
+              return;
+          }
           this.progress = 0;
           this.x = 0;
           this.bindEvents();
@@ -293,6 +309,7 @@ function initInfinityGallery() {
       }
   
       bindEvents() {
+          if (!this.el) return;
           window.addEventListener("resize", this.calculate.bind(this));
           window.addEventListener("scroll", this.handleScroll.bind(this));
           this.el.addEventListener("mousedown", (e) => this.handleStart(e));
@@ -305,9 +322,15 @@ function initInfinityGallery() {
       }
   
       calculate() {
+          if (!this.wrap || !this.el || !this.items || this.items.length === 0) {
+              return;
+          }
           this.wrapWidth = this.wrap.scrollWidth;
           this.containerWidth = this.el.clientWidth;
           const lastItem = this.items[this.items.length - 1];
+          if (!lastItem) {
+              return;
+          }
           const lastItemRight = lastItem.offsetLeft + lastItem.offsetWidth;
           this.maxScroll = lastItemRight - this.el.clientWidth;
           
@@ -426,6 +449,10 @@ function initInfinityGallery() {
   
   // Initialize galleries with individual triggers
   const galleries = document.querySelectorAll('.gallery');
+  if (!galleries || galleries.length === 0) {
+      // No galleries on this page, skip initialization
+      return;
+  }
   galleries.forEach((gallery, index) => {
       // Check if gallery is already visible on page load
       const rect = gallery.getBoundingClientRect();
@@ -438,8 +465,10 @@ function initInfinityGallery() {
               wrap: ".gallery-wrapper",
               item: ".gallery-item",
           });
-          slider.calculate();
-          gallery.setAttribute('data-gallery-initialized', 'true');
+          if (slider && slider.el) {
+              slider.calculate();
+              gallery.setAttribute('data-gallery-initialized', 'true');
+          }
       } else {
           // Create individual trigger for each gallery
           const trigger = ScrollTrigger.create({
@@ -453,8 +482,10 @@ function initInfinityGallery() {
                           wrap: ".gallery-wrapper",
                           item: ".gallery-item",
                       });
-                      slider.calculate();
-                      gallery.setAttribute('data-gallery-initialized', 'true');
+                      if (slider && slider.el) {
+                          slider.calculate();
+                          gallery.setAttribute('data-gallery-initialized', 'true');
+                      }
                   }
               },
               onLeave: () => {
@@ -468,7 +499,9 @@ function initInfinityGallery() {
                           wrap: ".gallery-wrapper",
                           item: ".gallery-item",
                       });
-                      slider.calculate();
+                      if (slider && slider.el) {
+                          slider.calculate();
+                      }
                   }
               }
           });
@@ -636,6 +669,10 @@ function initSvgAnimations() {
     // ========================================
 
     const container = document.querySelector('.road-container');
+    if (!container) {
+        // Road container doesn't exist on this page, skip SVG animations
+        return;
+    }
     const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     svg.setAttribute('viewBox', '0 0 439 378');
     svg.setAttribute('fill', 'none');
@@ -3350,6 +3387,36 @@ function initializeApplication() {
 }
 
 
-  initializeApplication();
-
+  // Wait for DOM and dependencies to be ready
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      // Also wait for GSAP to be available
+      if (typeof gsap !== 'undefined') {
+        initializeApplication();
+      } else {
+        // Wait a bit for GSAP to load
+        setTimeout(() => {
+          if (typeof gsap !== 'undefined') {
+            initializeApplication();
+          } else {
+            console.error('GSAP not loaded. Cannot initialize application.');
+          }
+        }, 100);
+      }
+    });
+  } else {
+    // DOM already loaded
+    if (typeof gsap !== 'undefined') {
+      initializeApplication();
+    } else {
+      // Wait for GSAP
+      setTimeout(() => {
+        if (typeof gsap !== 'undefined') {
+          initializeApplication();
+        } else {
+          console.error('GSAP not loaded. Cannot initialize application.');
+        }
+      }, 100);
+    }
+  }
 
