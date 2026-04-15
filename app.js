@@ -294,6 +294,8 @@ function initInfinityGallery() {
           this.scrollProgress = 0;
           this.manualDragOffset = 0;
           this.isManualDrag = false;
+          this.hasActivated = false;
+          this.lastScrollY = 0;
           this.init();
       }
   
@@ -349,20 +351,29 @@ function initInfinityGallery() {
           const scrollY = window.scrollY;
           const galleryRect = this.el.getBoundingClientRect();
           
-          // Check if gallery is in viewport
-          if (galleryRect.bottom < 0 || galleryRect.top > window.innerHeight) {
-              this.scrollProgress = 0;
+          // Activation rule:
+          // - Before first activation: do nothing until the gallery is fully inside viewport.
+          // - After activation: keep updating even after passing the gallery (never "stops").
+          if (!this.hasActivated) {
+              const isFullyVisible = galleryRect.top >= 0 && galleryRect.bottom <= window.innerHeight;
+              if (!isFullyVisible) {
+                  this.lastScrollY = scrollY;
+                  return;
+              }
+              this.hasActivated = true;
+              this.lastScrollY = scrollY;
               return;
           }
           
-          // Calculate scroll progress through the gallery
-          // Start from when gallery enters viewport (top of gallery reaches top of viewport)
-          const galleryStart = this.galleryTop;
-          const galleryEnd = this.galleryTop + this.galleryHeight + window.innerHeight;
-          const scrollProgress = Math.max(0, Math.min(1, (scrollY - galleryStart + window.innerHeight) / (galleryEnd - galleryStart)));
-          
-          // Map scroll progress to gallery position
-          this.scrollProgress = scrollProgress * this.maxScroll;
+          // Advance progress by scroll delta (prevents jumps and never resets).
+          const deltaY = scrollY - this.lastScrollY;
+          this.lastScrollY = scrollY;
+
+          // Map vertical scroll distance to horizontal travel.
+          // Tune by changing the denominator: larger => slower.
+          const denom = Math.max(1, this.galleryHeight + window.innerHeight);
+          const pxPerScrollY = this.maxScroll / denom;
+          this.scrollProgress = Math.max(0, Math.min(this.scrollProgress + deltaY * pxPerScrollY, this.maxScroll));
       }
   
       handleStart(e) {
@@ -454,12 +465,8 @@ function initInfinityGallery() {
       return;
   }
   galleries.forEach((gallery, index) => {
-      // Check if gallery is already visible on page load
-      const rect = gallery.getBoundingClientRect();
-      const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
-      
-      if (isVisible) {
-          // Initialize immediately if gallery is already visible
+      const getOrCreateSlider = () => {
+          if (gallery.__dragScrollInstance) return gallery.__dragScrollInstance;
           const slider = new DragScroll({
               el: gallery,
               wrap: ".gallery-wrapper",
@@ -467,8 +474,19 @@ function initInfinityGallery() {
           });
           if (slider && slider.el) {
               slider.calculate();
+              gallery.__dragScrollInstance = slider;
               gallery.setAttribute('data-gallery-initialized', 'true');
           }
+          return gallery.__dragScrollInstance;
+      };
+
+      // Check if gallery is already visible on page load
+      const rect = gallery.getBoundingClientRect();
+      const isVisible = rect.top < window.innerHeight && rect.bottom > 0;
+      
+      if (isVisible) {
+          // Initialize immediately if gallery is already visible
+          getOrCreateSlider();
       } else {
           // Create individual trigger for each gallery
           const trigger = ScrollTrigger.create({
@@ -476,33 +494,15 @@ function initInfinityGallery() {
               start: "top 80%", // Trigger when gallery is 80% from top of viewport
               onEnter: () => {
                   // Only initialize if not already initialized
-                  if (!gallery.hasAttribute('data-gallery-initialized')) {
-                      const slider = new DragScroll({
-                          el: gallery,
-                          wrap: ".gallery-wrapper",
-                          item: ".gallery-item",
-                      });
-                      if (slider && slider.el) {
-                          slider.calculate();
-                          gallery.setAttribute('data-gallery-initialized', 'true');
-                      }
-                  }
+                  getOrCreateSlider();
               },
               onLeave: () => {
                   // Optional: cleanup when leaving gallery
               },
               onEnterBack: () => {
-                  // Re-initialize when scrolling back up
-                  if (gallery.hasAttribute('data-gallery-initialized')) {
-                      const slider = new DragScroll({
-                          el: gallery,
-                          wrap: ".gallery-wrapper",
-                          item: ".gallery-item",
-                      });
-                      if (slider && slider.el) {
-                          slider.calculate();
-                      }
-                  }
+                  // Keep the same instance to preserve progress
+                  const slider = getOrCreateSlider();
+                  if (slider) slider.calculate();
               }
           });
       }
