@@ -29,29 +29,111 @@ function initScrollRestoration() {
 // ============================================================
 
 function initVimeoVideos() {
-  // Simple Vimeo iframe initialization - no complex wrappers
   const vimeoIframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
-  
+
   vimeoIframes.forEach(iframe => {
-    // Basic iframe optimization
     iframe.setAttribute('loading', 'lazy');
     iframe.setAttribute('allow', 'autoplay; fullscreen; picture-in-picture');
     iframe.setAttribute('allowfullscreen', '');
     iframe.setAttribute('frameborder', '0');
-    
-    // Ensure iframe is visible
+    iframe.setAttribute('tabindex', '-1');
     iframe.style.display = 'block';
     iframe.style.visibility = 'visible';
     iframe.style.border = 'none';
-    
-    // Add basic error handling
+    iframe.style.pointerEvents = 'none';
+
     iframe.addEventListener('error', () => {
       console.log('Vimeo iframe failed to load:', iframe.src);
     });
-    
+
     iframe.addEventListener('load', () => {
       console.log('Vimeo iframe loaded successfully:', iframe.src);
     });
+  });
+}
+
+function ensureVideoScrollFrames() {
+  const scrollFrameSelectors = '.image-wrapper, .video-wrapper, .video-scroll-frame';
+  const embedSelectors = '.w-embed, .code-embed, [class*="code-embed"]';
+  const boundFrames = new WeakSet();
+
+  const shouldSkipIframe = (iframe) => {
+    if (!iframe || iframe.id === 'showreel-video') return true;
+    if (!iframe.src || !iframe.src.includes('player.vimeo.com')) return true;
+    return !!iframe.closest('.hero .video-visual, .vimeo-wrapper, #showreel-video');
+  };
+
+  const getOrCreateScrollFrame = (iframe) => {
+    const existingFrame = iframe.closest(scrollFrameSelectors);
+    if (existingFrame) return existingFrame;
+
+    const embed = iframe.closest(embedSelectors);
+    if (embed) {
+      const embedParent = embed.parentElement;
+      if (embedParent && embedParent.matches(scrollFrameSelectors)) {
+        return embedParent;
+      }
+
+      const frame = document.createElement('div');
+      frame.className = 'video-scroll-frame';
+      embed.parentNode.insertBefore(frame, embed);
+      frame.appendChild(embed);
+      return frame;
+    }
+
+    const frame = document.createElement('div');
+    frame.className = 'video-scroll-frame';
+    iframe.parentNode.insertBefore(frame, iframe);
+    frame.appendChild(iframe);
+    return frame;
+  };
+
+  const bindScrollFrame = (frame) => {
+    if (!frame || boundFrames.has(frame)) return;
+    boundFrames.add(frame);
+
+    frame.classList.add('has-video-embed');
+
+    frame.querySelectorAll('iframe[src*="player.vimeo.com"]').forEach((iframe) => {
+      iframe.setAttribute('tabindex', '-1');
+      iframe.style.pointerEvents = 'none';
+    });
+
+    frame.querySelectorAll(embedSelectors).forEach((embed) => {
+      embed.style.pointerEvents = 'none';
+    });
+
+    const forwardScroll = (event) => {
+      const scroller = window.customSmoothScroll;
+      if (!scroller || !scroller.scrollEnabled) return;
+
+      if (event.type === 'wheel') {
+        scroller.onScroll(event.deltaY * scroller.wheelMultiplier);
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
+
+      if (event.type === 'touchmove' && event.touches.length === 1) {
+        const currentY = event.touches[0].clientY;
+        const delta = (frame._touchStartY - currentY) * scroller.touchMultiplier;
+        scroller.onScroll(delta);
+        frame._touchStartY = currentY;
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+
+    frame.addEventListener('wheel', forwardScroll, { passive: false, capture: true });
+    frame.addEventListener('touchstart', (event) => {
+      frame._touchStartY = event.touches[0].clientY;
+    }, { passive: true, capture: true });
+    frame.addEventListener('touchmove', forwardScroll, { passive: false, capture: true });
+  };
+
+  document.querySelectorAll('iframe[src*="player.vimeo.com"]').forEach((iframe) => {
+    if (shouldSkipIframe(iframe)) return;
+    bindScrollFrame(getOrCreateScrollFrame(iframe));
   });
 }
 
@@ -1744,24 +1826,6 @@ if (window.innerWidth > 650 && !document.body.classList.contains('about-page')) 
   
   
  gsap.utils.toArray('.image-wrapper img').forEach(img => {
-    // Parallax scroll effect
-/*    gsap.fromTo(
-        img,
-        { y: '-10%' },
-        {
-            y: '10%',
-            ease: 'none',
-            scrollTrigger: {
-                trigger: img,
-                start: 'top bottom',
-                end: 'bottom top',
-                scrub: 1.2
-            }
-        }
-    );
-    */
-
-    // Apply hover only if inside .home
     if (img.closest('.home, .more-work')) {
         img.addEventListener('mouseenter', () => {
             gsap.to(img, {
@@ -1781,8 +1845,6 @@ if (window.innerWidth > 650 && !document.body.classList.contains('about-page')) 
             });
         });
     }
-   
-
 });
   
   
@@ -2637,9 +2699,10 @@ function initCustomSmoothScrolling() {
         }
 
         bindEvents() {
-            // Mouse Wheel Scroll
             window.addEventListener("wheel", (e) => {
                 if (!this.scrollEnabled || isSliderDragging) return;
+                if (e.target.closest('.has-video-embed')) return;
+
                 const delta = e.deltaY * this.wheelMultiplier;
                 this.onScroll(delta);
                 e.preventDefault();
@@ -3356,7 +3419,6 @@ function sliderInfinity() {
 
 
 function initializeApplication() {
-    // Disable scroll for 2 seconds to allow galleries and videos to load
     initScrollDelay();
 
 /*    initLogosLoop();*/
@@ -3367,8 +3429,8 @@ function initializeApplication() {
     initScrollRestoration();
     setupMegaMenuEventListeners();
     initCustomSmoothScrolling();
-    // Initialize Vimeo videos
     initVimeoVideos();
+    ensureVideoScrollFrames();
 
     initSplitTextAnimations();
 
