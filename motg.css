@@ -1263,6 +1263,48 @@ iframe {
   position:relative;
 }
 
+/* Safari scroll pass: keep Vimeo inside a frame and route wheel events through it. */
+.has-video-embed,
+.video-scroll-frame {
+  position: relative;
+  isolation: isolate;
+}
+
+.has-video-embed .w-embed,
+.has-video-embed .code-embed,
+.has-video-embed [class*="code-embed"],
+.video-scroll-frame .w-embed,
+.video-scroll-frame .code-embed,
+.video-scroll-frame [class*="code-embed"] {
+  pointer-events: none !important;
+}
+
+.image-wrapper.has-video-embed .w-embed,
+.image-wrapper.has-video-embed .code-embed,
+.image-wrapper.has-video-embed [class*="code-embed"] {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.has-video-embed iframe,
+.video-scroll-frame iframe {
+  pointer-events: none !important;
+}
+
+.has-video-embed::after,
+.video-scroll-frame::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.video-scroll-frame {
+  width: 100%;
+  overflow: hidden;
+}
+
 .image-wrapper img {
 	object-fit: contain;
 	min-height: 100%;
