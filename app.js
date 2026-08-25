@@ -55,12 +55,25 @@ function initVimeoVideos() {
 function ensureVideoScrollFrames() {
   const scrollFrameSelectors = '.image-wrapper, .video-wrapper, .video-scroll-frame';
   const embedSelectors = '.w-embed, .code-embed, [class*="code-embed"]';
-  const boundFrames = new WeakSet();
+  const boundFrames = window.__motgVideoScrollBoundFrames || (window.__motgVideoScrollBoundFrames = new WeakSet());
 
   const shouldSkipIframe = (iframe) => {
     if (!iframe || iframe.id === 'showreel-video') return true;
     if (!iframe.src || !iframe.src.includes('player.vimeo.com')) return true;
     return !!iframe.closest('.hero .video-visual, .vimeo-wrapper, #showreel-video');
+  };
+
+  const normalizeVideoEmbedStructure = (iframe) => {
+    const embed = iframe.closest(embedSelectors);
+    if (!embed) return;
+
+    const clickDisable = embed.parentElement;
+    if (!clickDisable?.classList.contains('click-disable')) return;
+
+    const frame = clickDisable.closest(scrollFrameSelectors);
+    if (!frame || clickDisable.parentElement !== frame) return;
+
+    frame.insertBefore(embed, clickDisable.nextSibling);
   };
 
   const getOrCreateScrollFrame = (iframe) => {
@@ -133,8 +146,97 @@ function ensureVideoScrollFrames() {
 
   document.querySelectorAll('iframe[src*="player.vimeo.com"]').forEach((iframe) => {
     if (shouldSkipIframe(iframe)) return;
+    normalizeVideoEmbedStructure(iframe);
     bindScrollFrame(getOrCreateScrollFrame(iframe));
   });
+}
+
+function initVideoScrollPassSystem() {
+  if (window.__motgVideoScrollPassReady) {
+    window.__motgVideoScrollPassRescan?.();
+    return;
+  }
+  window.__motgVideoScrollPassReady = true;
+
+  let retryCount = 0;
+  const maxRetries = 60;
+  let retryTimer = null;
+  let observerStarted = false;
+
+  const run = () => {
+    initVimeoVideos();
+    ensureVideoScrollFrames();
+  };
+
+  window.__motgVideoScrollPassRescan = () => {
+    retryCount = 0;
+    scheduleRetry();
+  };
+
+  const allVideoIframesHandled = () => {
+    const iframes = document.querySelectorAll('iframe[src*="player.vimeo.com"]:not(#showreel-video)');
+    if (!iframes.length) return true;
+
+    return Array.from(iframes).every((iframe) => {
+      if (!iframe.src || !iframe.src.includes('player.vimeo.com')) return true;
+      if (iframe.closest('.hero .video-visual, .vimeo-wrapper, #showreel-video')) return true;
+      return !!iframe.closest('.has-video-embed, .video-scroll-frame');
+    });
+  };
+
+  const scheduleRetry = () => {
+    if (retryTimer) return;
+
+    const attempt = () => {
+      run();
+      retryCount++;
+
+      const scrollerReady = window.customSmoothScroll?.scrollEnabled;
+      const framesReady = allVideoIframesHandled();
+
+      if ((scrollerReady && framesReady) || retryCount >= maxRetries) {
+        retryTimer = null;
+        retryCount = 0;
+        return;
+      }
+
+      retryTimer = setTimeout(() => {
+        retryTimer = null;
+        attempt();
+      }, 100);
+    };
+
+    attempt();
+  };
+
+  const startObserver = () => {
+    if (observerStarted || !document.body) return;
+    observerStarted = true;
+
+    const observer = new MutationObserver((mutations) => {
+      const hasNewVideo = mutations.some((mutation) =>
+        Array.from(mutation.addedNodes).some((node) => {
+          if (node.nodeType !== 1) return false;
+          return node.matches?.('iframe[src*="player.vimeo.com"]')
+            || !!node.querySelector?.('iframe[src*="player.vimeo.com"]');
+        })
+      );
+
+      if (hasNewVideo) scheduleRetry();
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+  };
+
+  document.addEventListener('load', (event) => {
+    if (event.target?.matches?.('iframe[src*="player.vimeo.com"]:not(#showreel-video)')) {
+      scheduleRetry();
+    }
+  }, true);
+
+  window.addEventListener('load', scheduleRetry);
+  startObserver();
+  scheduleRetry();
 }
 
 function extractVimeoId(url) {
@@ -3429,8 +3531,7 @@ function initializeApplication() {
     initScrollRestoration();
     setupMegaMenuEventListeners();
     initCustomSmoothScrolling();
-    initVimeoVideos();
-    ensureVideoScrollFrames();
+    initVideoScrollPassSystem();
 
     initSplitTextAnimations();
 
