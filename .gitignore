@@ -3,3 +3,8 @@
 .env.*
 *.log
 node_modules/
+
+# Local Webflow export mirrors (dev only — not pushed to GitHub)
+/index.html
+/work/
+/works/
