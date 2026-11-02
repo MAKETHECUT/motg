@@ -51,13 +51,22 @@ function getVimeoIframeUrl(iframe) {
 
 function deferVimeoIframe(iframe) {
   if (isVimeoSkipIframe(iframe)) return;
-  if (iframe.dataset.vimeoSrc) return;
 
-  const src = iframe.getAttribute('src');
-  if (!src || !src.includes('player.vimeo.com')) return;
+  let src = iframe.getAttribute('src') || '';
+  if (iframe.dataset.vimeoSrc) {
+    src = iframe.dataset.vimeoSrc;
+  } else if (src.includes('player.vimeo.com')) {
+    iframe.dataset.vimeoSrc = src;
+  } else if (src && !src.includes('player.vimeo.com')) {
+    iframe.removeAttribute('src');
+    return;
+  } else {
+    return;
+  }
 
-  iframe.dataset.vimeoSrc = src;
-  iframe.removeAttribute('src');
+  if (iframe.getAttribute('src')?.includes('player.vimeo.com')) {
+    iframe.removeAttribute('src');
+  }
   iframe.dataset.vimeoManaged = 'deferred';
 }
 
@@ -87,6 +96,33 @@ const MotgVimeoViewport = (() => {
       iframe.parentElement ||
       iframe
     );
+  }
+
+  function getScrollPosition() {
+    const scroller = window.customSmoothScroll;
+    if (scroller && typeof scroller.currentScroll === 'number') {
+      return scroller.currentScroll;
+    }
+    return window.scrollY || document.documentElement.scrollTop || 0;
+  }
+
+  function isInPlayWarmZone(iframe) {
+    const vh = window.innerHeight || 800;
+    const playAhead = vh * MOTG_VIMEO_PLAY_AHEAD_VH;
+    const rect = getObserveTarget(iframe).getBoundingClientRect();
+    return rect.bottom > -vh * 0.35 && rect.top < vh + playAhead;
+  }
+
+  function isInPrefetchZone(iframe) {
+    const vh = window.innerHeight || 800;
+    const prefetchAhead = vh * MOTG_VIMEO_PREFETCH_AHEAD_VH;
+    const rect = getObserveTarget(iframe).getBoundingClientRect();
+    return rect.bottom > -vh * 0.75 && rect.top < vh + prefetchAhead;
+  }
+
+  function isBackgroundEmbed(iframe) {
+    const url = iframe.dataset.vimeoSrc || iframe.getAttribute('src') || '';
+    return url.includes('background=1');
   }
 
   function prioritizeLoadQueue() {
@@ -182,9 +218,11 @@ const MotgVimeoViewport = (() => {
     if (scrollSyncStarted) return;
     scrollSyncStarted = true;
 
+    let warmFrame = 0;
     const tick = () => {
-      const y = window.scrollY || document.documentElement.scrollTop || 0;
-      if (y !== lastScrollY) {
+      const y = getScrollPosition();
+      warmFrame++;
+      if (Math.abs(y - lastScrollY) > 1 || warmFrame % 12 === 0) {
         lastScrollY = y;
         refreshWarmZone();
       }
@@ -193,6 +231,8 @@ const MotgVimeoViewport = (() => {
 
     requestAnimationFrame(tick);
     refreshWarmZone();
+    window.addEventListener('load', () => refreshWarmZone(), { once: true });
+    setTimeout(refreshWarmZone, 2200);
   }
 
   function scheduleVisibilitySync() {
@@ -222,7 +262,14 @@ const MotgVimeoViewport = (() => {
         () => {
           activeLoads = Math.max(0, activeLoads - 1);
           iframe.dataset.vimeoManaged = 'ready';
-          bindPlayer(iframe).then(() => syncPlayback(iframe)); // pause unless in play zone
+          if (isInPlayWarmZone(iframe)) {
+            playIntent.set(iframe, true);
+          }
+          if (isBackgroundEmbed(iframe) && isInPlayWarmZone(iframe)) {
+            flushLoadQueue();
+            return;
+          }
+          bindPlayer(iframe).then(() => syncPlayback(iframe));
           flushLoadQueue();
         },
         { once: true }
@@ -249,7 +296,8 @@ const MotgVimeoViewport = (() => {
   }
 
   function unloadIframe(iframe) {
-    prefetchIntent.set(iframe, false);
+    if (isInPrefetchZone(iframe)) return;
+
     playIntent.set(iframe, false);
     const idx = loadQueue.indexOf(iframe);
     if (idx >= 0) loadQueue.splice(idx, 1);
@@ -264,6 +312,7 @@ const MotgVimeoViewport = (() => {
       iframe.dataset.vimeoManaged = 'deferred';
       players.delete(iframe);
     }
+    prefetchIntent.set(iframe, false);
   }
 
   async function bindPlayer(iframe) {
@@ -279,7 +328,11 @@ const MotgVimeoViewport = (() => {
   }
 
   async function syncPlayback(iframe) {
-    const shouldPlay = !!playIntent.get(iframe);
+    const shouldPlay = !!playIntent.get(iframe) || isInPlayWarmZone(iframe);
+    if (isBackgroundEmbed(iframe) && shouldPlay) {
+      return;
+    }
+
     const player = players.get(iframe) || (await bindPlayer(iframe));
     if (!player) return;
 
@@ -307,12 +360,12 @@ const MotgVimeoViewport = (() => {
         (entry.target.matches?.('iframe[data-vimeo-src], iframe[src*="player.vimeo.com"]') ? entry.target : null);
       if (!iframe || isVimeoSkipIframe(iframe)) return;
 
-      const shouldPlay = entry.isIntersecting;
-      playIntent.set(iframe, shouldPlay);
-
-      if (shouldPlay) {
+      if (entry.isIntersecting) {
+        playIntent.set(iframe, true);
         prefetchIntent.set(iframe, true);
         requestLoad(iframe);
+      } else if (!isInPlayWarmZone(iframe)) {
+        playIntent.set(iframe, false);
       }
 
       if (iframe.getAttribute('src')?.includes('player.vimeo.com')) {
@@ -341,6 +394,7 @@ const MotgVimeoViewport = (() => {
   function init() {
     if (initialized) {
       rescan();
+      refreshWarmZone();
       return;
     }
     initialized = true;
